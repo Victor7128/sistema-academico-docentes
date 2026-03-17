@@ -1,24 +1,16 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
-
 import tailwindcss from '@tailwindcss/vite';
-
 import svelte from '@astrojs/svelte';
-
-import node from '@astrojs/node';
-
 import auth from 'auth-astro';
 
-// https://astro.build/config
+const adapter = process.env.VERCEL
+  ? (await import('@astrojs/vercel')).default()
+  : (await import('@astrojs/node')).default({ mode: 'standalone' });
+
 export default defineConfig({
   output: 'server',
-  vite: {
-    plugins: [tailwindcss()]
-  },
-
+  vite: { plugins: [tailwindcss()] },
   integrations: [svelte(), auth()],
-
-  adapter: node({
-    mode: 'standalone'
-  })
+  adapter: adapter,
 });

@@ -284,9 +284,9 @@
                 <tr class="border-b border-gray-200">
                     <th
                         rowspan="3"
-                        class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase
+                        class="col-nombre text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase
                                tracking-wider sticky left-0 bg-gray-50 z-10 border-r border-gray-200
-                               min-w-44 align-bottom"
+                               align-bottom"
                     >
                         Alumno
                     </th>
@@ -368,10 +368,10 @@
                     <tr class="hover:bg-gray-50/50 transition-colors group">
 
                         <!-- Nombre sticky -->
-                        <td class="px-4 py-2.5 sticky left-0 z-10 bg-white border-r border-gray-200
+                        <td class="col-nombre px-2 py-2.5 sticky left-0 z-10 bg-white border-r border-gray-200
                                    group-hover:bg-gray-50/80 transition-colors">
-                            <span class="text-xs text-gray-400 mr-1.5">{idx + 1}</span>
-                            <span class="text-sm text-gray-900 font-medium whitespace-nowrap">
+                            <span class="text-xs text-gray-400 mr-0.5">{idx + 1}</span>
+                            <span class="nombre-alumno text-sm text-gray-900 font-medium">
                                 {alumno.apellido}, {alumno.nombre}
                             </span>
                         </td>
@@ -416,37 +416,3 @@
         </table>
     </div>
 {/if}
-<style>
-  /* ── Institutional Blue Design System ── */
-  :global(.bg-blue-600)                   { background-color: #1B3A6B !important; }
-  :global(.bg-blue-500)                   { background-color: #2A5298 !important; }
-  :global(.bg-blue-50)                    { background-color: #EEF2F9 !important; }
-  :global(.bg-blue-100)                   { background-color: #D6E3F5 !important; }
-  :global(.hover\:bg-blue-700:hover)      { background-color: #2A5298 !important; }
-  :global(.hover\:bg-blue-50:hover)       { background-color: #EEF2F9 !important; }
-  :global(.hover\:bg-blue-100:hover)      { background-color: #D6E3F5 !important; }
-  :global(.hover\:bg-blue-100\/70:hover)  { background-color: rgba(214,227,245,.7) !important; }
-  :global(.disabled\:bg-blue-300)         { background-color: rgba(27,58,107,.32) !important; }
-  :global(.text-blue-600)                 { color: #1B3A6B !important; }
-  :global(.text-blue-700)                 { color: #1B3A6B !important; }
-  :global(.text-blue-800)                 { color: #0F2A52 !important; }
-  :global(.text-blue-500)                 { color: #2A5298 !important; }
-  :global(.hover\:text-blue-600:hover)    { color: #1B3A6B !important; }
-  :global(.hover\:text-blue-700:hover)    { color: #0F2A52 !important; }
-  :global(.group-hover\:text-blue-600)    { color: #1B3A6B !important; }
-  :global(.group-hover\:text-blue-400)    { color: rgba(27,58,107,.55) !important; }
-  :global(.border-blue-500)              { border-color: #1B3A6B !important; }
-  :global(.border-blue-300)              { border-color: rgba(27,58,107,.35) !important; }
-  :global(.border-blue-200)              { border-color: rgba(27,58,107,.2) !important; }
-  :global(.border-blue-100)              { border-color: rgba(27,58,107,.12) !important; }
-  :global(.focus\:ring-blue-500)         { --tw-ring-color: rgba(27,58,107,.4) !important; }
-  :global(.focus\:ring-blue-400)         { --tw-ring-color: rgba(27,58,107,.35) !important; }
-  :global(.divide-blue-100 > * + *)      { border-color: rgba(27,58,107,.1) !important; }
-  /* Progress bar */
-  :global(.bg-blue-500.rounded-full)     { background-color: #1B3A6B !important; }
-  /* "Evaluar" link */
-  :global(.text-blue-600.border.border-blue-200) {
-    color: #1B3A6B !important;
-    border-color: rgba(27,58,107,.22) !important;
-  }
-</style>

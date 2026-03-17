@@ -278,11 +278,8 @@
                                    {completo ? 'bg-green-50/60 group-hover:bg-green-50' : 'bg-white group-hover:bg-gray-50/60'}">
                             <div class="flex items-center gap-1.5">
                                 <span class="shrink-0 w-1.5 h-1.5 rounded-full {completo ? 'bg-green-500' : 'bg-gray-200'}"></span>
-                                <span class="nombre-completo text-sm text-gray-900 font-medium truncate">
+                                <span class="nombre-alumno text-sm text-gray-900 font-medium">
                                     {alumno.apellido}, {alumno.nombre}
-                                </span>
-                                <span class="nombre-corto text-gray-900 font-medium truncate">
-                                    {alumno.apellido}
                                 </span>
                             </div>
                         </td>
@@ -333,19 +330,23 @@
   .col-nombre {
     width: 150px;
     min-width: 150px;
-    max-width: 350px;
+    max-width: 150px;
   }
-  .nombre-corto    { display: none; }
-  .nombre-completo { display: block; }
+  .nombre-alumno { display: inline; }
 
   @media (max-width: 640px) {
     .col-nombre {
-      width: 10px;
-      min-width: 10px;
-      max-width: 10px;
+      width: 82px;
+      min-width: 82px;
+      max-width: 82px;
     }
-    .nombre-completo { display: block; font-size: .60rem;}
-    .nombre-corto    { display: none;  }
+    .nombre-alumno {
+      font-size: .60rem;
+      line-height: 1.25;
+      word-break: break-word;
+      white-space: normal;
+      display: block;
+    }
   }
 
   /* ── Institutional Blue Design System ── */

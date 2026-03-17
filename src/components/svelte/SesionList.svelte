@@ -161,7 +161,8 @@
         editando = s;
         formTitulo = s.titulo;
         formProducto = s.producto;
-        formFecha = s.fecha.split("T")[0];
+        const _f: any = s.fecha;
+        formFecha = (_f instanceof Date ? _f.toISOString() : String(_f)).split("T")[0];
         cargarDesde(s.criterios);
         error = "";
         modalAbierto = true;
@@ -292,7 +293,16 @@
     }
 
     function formatFecha(fecha: string) {
-        return new Date(fecha + "T12:00:00").toLocaleDateString("es-PE", {
+        const raw: any = fecha;
+        let d: Date;
+        if (raw instanceof Date) {
+            d = raw;
+        } else {
+            const s = String(raw).split("T")[0];
+            d = new Date(s + "T12:00:00");
+        }
+        if (isNaN(d.getTime())) return "";
+        return d.toLocaleDateString("es-PE", {
             day: "2-digit",
             month: "short",
             year: "numeric",
@@ -754,38 +764,3 @@
         </div>
     </div>
 {/if}
-
-<style>
-  /* ── Institutional Blue Design System ── */
-  :global(.bg-blue-600)                   { background-color: #1B3A6B !important; }
-  :global(.bg-blue-500)                   { background-color: #2A5298 !important; }
-  :global(.bg-blue-50)                    { background-color: #EEF2F9 !important; }
-  :global(.bg-blue-100)                   { background-color: #D6E3F5 !important; }
-  :global(.hover\:bg-blue-700:hover)      { background-color: #2A5298 !important; }
-  :global(.hover\:bg-blue-50:hover)       { background-color: #EEF2F9 !important; }
-  :global(.hover\:bg-blue-100:hover)      { background-color: #D6E3F5 !important; }
-  :global(.hover\:bg-blue-100\/70:hover)  { background-color: rgba(214,227,245,.7) !important; }
-  :global(.disabled\:bg-blue-300)         { background-color: rgba(27,58,107,.32) !important; }
-  :global(.text-blue-600)                 { color: #1B3A6B !important; }
-  :global(.text-blue-700)                 { color: #1B3A6B !important; }
-  :global(.text-blue-800)                 { color: #0F2A52 !important; }
-  :global(.text-blue-500)                 { color: #2A5298 !important; }
-  :global(.hover\:text-blue-600:hover)    { color: #1B3A6B !important; }
-  :global(.hover\:text-blue-700:hover)    { color: #0F2A52 !important; }
-  :global(.group-hover\:text-blue-600)    { color: #1B3A6B !important; }
-  :global(.group-hover\:text-blue-400)    { color: rgba(27,58,107,.55) !important; }
-  :global(.border-blue-500)              { border-color: #1B3A6B !important; }
-  :global(.border-blue-300)              { border-color: rgba(27,58,107,.35) !important; }
-  :global(.border-blue-200)              { border-color: rgba(27,58,107,.2) !important; }
-  :global(.border-blue-100)              { border-color: rgba(27,58,107,.12) !important; }
-  :global(.focus\:ring-blue-500)         { --tw-ring-color: rgba(27,58,107,.4) !important; }
-  :global(.focus\:ring-blue-400)         { --tw-ring-color: rgba(27,58,107,.35) !important; }
-  :global(.divide-blue-100 > * + *)      { border-color: rgba(27,58,107,.1) !important; }
-  /* Progress bar */
-  :global(.bg-blue-500.rounded-full)     { background-color: #1B3A6B !important; }
-  /* "Evaluar" link */
-  :global(.text-blue-600.border.border-blue-200) {
-    color: #1B3A6B !important;
-    border-color: rgba(27,58,107,.22) !important;
-  }
-</style>

@@ -209,9 +209,9 @@
                     <!-- celda vacía sobre la columna de alumno -->
                     <th
                         rowspan="3"
-                        class="col-nombre text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase
+                        class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase
                                tracking-wider sticky left-0 bg-gray-50 z-10 border-r border-gray-200
-                               align-bottom"
+                               min-w-40 align-bottom"
                     >
                         Alumno
                     </th>
@@ -281,7 +281,7 @@
                                 <span class="nombre-completo text-sm text-gray-900 font-medium truncate">
                                     {alumno.apellido}, {alumno.nombre}
                                 </span>
-                                <span class="nombre-corto text-sm text-gray-900 font-medium truncate">
+                                <span class="nombre-corto text-gray-900 font-medium truncate">
                                     {alumno.apellido}
                                 </span>
                             </div>
@@ -331,23 +331,21 @@
 <style>
   /* ── Columna de nombres responsive ── */
   .col-nombre {
-    width: 120px;
-    min-width: 120px;
-    max-width: 120px;
+    width: 150px;
+    min-width: 150px;
+    max-width: 350px;
   }
-  /* En desktop muestra nombre completo, oculta el corto */
-  .nombre-corto  { display: none; }
+  .nombre-corto    { display: none; }
   .nombre-completo { display: block; }
 
   @media (max-width: 640px) {
     .col-nombre {
-      width: 90px;
-      min-width: 90px;
-      max-width: 90px;
+      width: 10px;
+      min-width: 10px;
+      max-width: 10px;
     }
-    /* En móvil solo muestra apellido */
-    .nombre-completo { display: none; }
-    .nombre-corto    { display: block; }
+    .nombre-completo { display: block; font-size: .60rem;}
+    .nombre-corto    { display: none;  }
   }
 
   /* ── Institutional Blue Design System ── */

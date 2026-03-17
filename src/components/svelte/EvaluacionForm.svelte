@@ -209,9 +209,9 @@
                     <!-- celda vacía sobre la columna de alumno -->
                     <th
                         rowspan="3"
-                        class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase
+                        class="col-nombre text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase
                                tracking-wider sticky left-0 bg-gray-50 z-10 border-r border-gray-200
-                               min-w-40 align-bottom"
+                               align-bottom"
                     >
                         Alumno
                     </th>
@@ -274,12 +274,15 @@
                     <tr class="hover:bg-gray-50/60 transition-colors group {completo ? 'bg-green-50/30' : ''}">
 
                         <!-- Nombre sticky -->
-                        <td class="px-4 py-2.5 sticky left-0 z-10 border-r border-gray-200 transition-colors
+                        <td class="col-nombre px-2 py-2.5 sticky left-0 z-10 border-r border-gray-200 transition-colors
                                    {completo ? 'bg-green-50/60 group-hover:bg-green-50' : 'bg-white group-hover:bg-gray-50/60'}">
-                            <div class="flex items-center gap-2">
+                            <div class="flex items-center gap-1.5">
                                 <span class="shrink-0 w-1.5 h-1.5 rounded-full {completo ? 'bg-green-500' : 'bg-gray-200'}"></span>
-                                <span class="text-sm text-gray-900 font-medium whitespace-nowrap">
+                                <span class="nombre-completo text-sm text-gray-900 font-medium truncate">
                                     {alumno.apellido}, {alumno.nombre}
+                                </span>
+                                <span class="nombre-corto text-sm text-gray-900 font-medium truncate">
+                                    {alumno.apellido}
                                 </span>
                             </div>
                         </td>
@@ -326,6 +329,27 @@
     {/if}
 {/if}
 <style>
+  /* ── Columna de nombres responsive ── */
+  .col-nombre {
+    width: 120px;
+    min-width: 120px;
+    max-width: 120px;
+  }
+  /* En desktop muestra nombre completo, oculta el corto */
+  .nombre-corto  { display: none; }
+  .nombre-completo { display: block; }
+
+  @media (max-width: 640px) {
+    .col-nombre {
+      width: 90px;
+      min-width: 90px;
+      max-width: 90px;
+    }
+    /* En móvil solo muestra apellido */
+    .nombre-completo { display: none; }
+    .nombre-corto    { display: block; }
+  }
+
   /* ── Institutional Blue Design System ── */
   :global(.bg-blue-600)                   { background-color: #1B3A6B !important; }
   :global(.bg-blue-500)                   { background-color: #2A5298 !important; }

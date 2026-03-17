@@ -1,0 +1,36 @@
+---
+interface Props {
+  href: string;
+  titulo: string;
+  subtitulo?: string;
+  meta?: string;        // texto pequeño a la derecha (ej: "32 alumnos")
+}
+
+const { href, titulo, subtitulo, meta } = Astro.props;
+---
+
+<a
+  href={href}
+  class="flex items-center justify-between bg-white border border-gray-200
+         rounded-xl px-5 py-4 hover:border-blue-300 hover:shadow-sm
+         transition-all group"
+>
+  <div class="flex flex-col gap-0.5">
+    <span class="text-sm font-medium text-gray-900 group-hover:text-blue-600 transition-colors">
+      {titulo}
+    </span>
+    {subtitulo && (
+      <span class="text-xs text-gray-400">{subtitulo}</span>
+    )}
+  </div>
+
+  <div class="flex items-center gap-3">
+    {meta && (
+      <span class="text-xs text-gray-400">{meta}</span>
+    )}
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" class="text-gray-300 group-hover:text-blue-400 transition-colors">
+      <path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.5"
+            stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+</a>

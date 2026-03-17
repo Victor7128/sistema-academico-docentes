@@ -1,0 +1,116 @@
+---
+import Layout from '../../../../../../layouts/Layout.astro';
+import EvaluacionForm from '../../../../../../components/svelte/EvaluacionForm.svelte';
+import { query } from '../../../../../../lib/db';
+import type { Bimestre, Grado, Seccion, Sesion, Alumno, Evaluacion } from '../../../../../../lib/types';
+import { getCurriculoPorNombre } from '../../../../../../lib/curriculo/index';
+
+const docente = Astro.locals.docente;
+const { bimestreId, gradoId, seccionId, sesionId } = Astro.params;
+if (!bimestreId || !gradoId || !seccionId || !sesionId) return Astro.redirect('/');
+
+const [bimestre] = await query<Bimestre>`
+  SELECT id, nombre, anio FROM bimestre
+  WHERE id = ${bimestreId} AND docente_id = ${docente.id}
+`;
+if (!bimestre) return Astro.redirect('/');
+
+const [grado] = await query<Grado>`
+  SELECT g.id, g.nombre FROM grado g
+  JOIN docente_grado dg ON dg.grado_id = g.id
+  WHERE g.id = ${gradoId} AND dg.docente_id = ${docente.id} AND g.estado = 1
+`;
+if (!grado) return Astro.redirect(`/app/${bimestreId}`);
+
+const [seccion] = await query<Seccion>`
+  SELECT id, nombre FROM seccion
+  WHERE id = ${seccionId} AND grado_id = ${gradoId} AND estado = 1
+`;
+if (!seccion) return Astro.redirect(`/app/${bimestreId}/${gradoId}`);
+
+const [sesion] = await query<Sesion>`
+  SELECT id, titulo, producto, competencia_id AS "competenciaId",
+         capacidad_id AS "capacidadId", criterio, fecha, estado
+  FROM sesion
+  WHERE id = ${sesionId}
+    AND bimestre_id = ${bimestreId}
+    AND grado_id    = ${gradoId}
+    AND estado = 1
+`;
+if (!sesion) return Astro.redirect(`/app/${bimestreId}/${gradoId}/${seccionId}/sesiones`);
+
+// Alumnos activos de la sección
+const alumnos = await query<Alumno>`
+  SELECT id, orden, nombre, apellido, codigo
+  FROM alumno
+  WHERE seccion_id = ${seccionId} AND estado = 1
+  ORDER BY orden ASC, apellido ASC
+`;
+
+// Evaluaciones ya registradas para esta sesión
+const evaluaciones = await query<Evaluacion>`
+  SELECT id, alumno_id AS "alumnoId", nota, observacion
+  FROM evaluacion
+  WHERE sesion_id = ${sesionId}
+`;
+
+// Currículo para mostrar nombre de competencia y capacidad
+const [cursoDocente] = await query<{ nombre: string }>`
+  SELECT nombre FROM curso WHERE id = ${docente.cursoId}
+`;
+const curriculo = cursoDocente ? getCurriculoPorNombre(cursoDocente.nombre) : null;
+
+// Armar mapa alumnoId → evaluacion para pasarlo al componente
+const mapaEvaluaciones: Record<number, { nota: string; observacion: string | null }> = {};
+for (const ev of evaluaciones) {
+  mapaEvaluaciones[ev.alumnoId] = { nota: ev.nota, observacion: ev.observacion };
+}
+
+function nombreCompetencia(id: string) {
+  return curriculo?.competencias.find(c => String(c.id) === String(id))?.nombre ?? id;
+}
+function nombreCapacidad(compId: string, capId: string) {
+  const comp = curriculo?.competencias.find(c => String(c.id) === String(compId));
+  return comp?.capacidades.find((cap: any) => String(cap.id) === String(capId))?.nombre ?? capId;
+}
+---
+
+<Layout title={`Evaluar — ${sesion.titulo}`}>
+
+  <div class="mb-6">
+    <h1 class="text-xl font-semibold text-gray-900 leading-snug">
+      {sesion.titulo}
+    </h1>
+    <p class="text-sm text-gray-400 mt-0.5">
+      Sección {seccion.nombre} · {grado.nombre} · {bimestre.nombre} · {bimestre.anio}
+    </p>
+  </div>
+
+  <!-- Info de la sesión -->
+  <div class="bg-white border border-gray-200 rounded-xl px-5 py-4 mb-6 flex flex-col gap-1.5">
+    <div class="flex gap-2 text-sm">
+      <span class="text-gray-400 w-24 shrink-0">Producto</span>
+      <span class="text-gray-700">{sesion.producto}</span>
+    </div>
+    <div class="flex gap-2 text-sm">
+      <span class="text-gray-400 w-24 shrink-0">Competencia</span>
+      <span class="text-gray-700">{nombreCompetencia(sesion.competenciaId)}</span>
+    </div>
+    <div class="flex gap-2 text-sm">
+      <span class="text-gray-400 w-24 shrink-0">Capacidad</span>
+      <span class="text-gray-700">{nombreCapacidad(sesion.competenciaId, sesion.capacidadId)}</span>
+    </div>
+    <div class="flex gap-2 text-sm">
+      <span class="text-gray-400 w-24 shrink-0">Criterio</span>
+      <span class="text-gray-700">{sesion.criterio}</span>
+    </div>
+  </div>
+
+  <EvaluacionForm
+    client:load
+    alumnos={alumnos}
+    evaluacionesIniciales={mapaEvaluaciones}
+    sesionId={Number(sesionId)}
+  />
+
+</Layout>

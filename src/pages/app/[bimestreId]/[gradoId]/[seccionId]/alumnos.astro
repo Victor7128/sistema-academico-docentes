@@ -1,0 +1,55 @@
+---
+import Layout from '../../../../../layouts/Layout.astro';
+import AlumnosCRUD from '../../../../../components/svelte/AlumnosCRUD.svelte';
+import { query } from '../../../../../lib/db';
+import type { Bimestre, Grado, Seccion, Alumno } from '../../../../../lib/types';
+
+const docente = Astro.locals.docente;
+const { bimestreId, gradoId, seccionId } = Astro.params;
+if (!bimestreId || !gradoId || !seccionId) return Astro.redirect('/');
+
+const [bimestre] = await query<Bimestre>`
+  SELECT id, nombre, anio FROM bimestre
+  WHERE id = ${bimestreId} AND docente_id = ${docente.id}
+`;
+if (!bimestre) return Astro.redirect('/');
+
+const [grado] = await query<Grado>`
+  SELECT g.id, g.nombre FROM grado g
+  JOIN docente_grado dg ON dg.grado_id = g.id
+  WHERE g.id = ${gradoId} AND dg.docente_id = ${docente.id} AND g.estado = 1
+`;
+if (!grado) return Astro.redirect(`/app/${bimestreId}`);
+
+const [seccion] = await query<Seccion>`
+  SELECT id, nombre FROM seccion
+  WHERE id = ${seccionId} AND grado_id = ${gradoId} AND estado = 1
+`;
+if (!seccion) return Astro.redirect(`/app/${bimestreId}/${gradoId}`);
+
+const alumnos = await query<Alumno>`
+  SELECT id, orden, codigo, nombre, apellido, estado
+  FROM alumno
+  WHERE seccion_id = ${seccionId}
+  ORDER BY orden ASC, apellido ASC, nombre ASC
+`;
+---
+
+<Layout title={`Alumnos — Sección ${seccion.nombre}`}>
+
+  <div class="mb-6">
+    <h1 class="text-xl font-semibold text-gray-900">
+      Alumnos · Sección {seccion.nombre}
+    </h1>
+    <p class="text-sm text-gray-400 mt-0.5">
+      {grado.nombre} · {bimestre.nombre} · {bimestre.anio}
+    </p>
+  </div>
+
+  <AlumnosCRUD
+    client:load
+    alumnos={alumnos}
+    seccionId={Number(seccionId)}
+  />
+
+</Layout>

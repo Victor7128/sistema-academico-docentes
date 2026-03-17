@@ -1,0 +1,87 @@
+---
+import Layout from '../../../../../layouts/Layout.astro';
+import NavCard from '../../../../../components/astro/NavCard.astro';
+import { query } from '../../../../../lib/db';
+import type { Bimestre, Grado, Seccion } from '../../../../../lib/types';
+
+const docente = Astro.locals.docente;
+const { bimestreId, gradoId, seccionId } = Astro.params;
+if (!bimestreId || !gradoId || !seccionId) return Astro.redirect('/');
+
+const [bimestre] = await query<Bimestre>`
+  SELECT id, nombre, anio
+  FROM bimestre
+  WHERE id = ${bimestreId}
+    AND docente_id = ${docente.id}
+`;
+
+if (!bimestre) return Astro.redirect('/');
+
+const [grado] = await query<Grado>`
+  SELECT g.id, g.nombre
+  FROM grado g
+  JOIN docente_grado dg ON dg.grado_id = g.id
+  WHERE g.id = ${gradoId}
+    AND dg.docente_id = ${docente.id}
+    AND g.estado = 1
+`;
+
+if (!grado) return Astro.redirect(`/app/${bimestreId}`);
+
+const [seccion] = await query<Seccion>`
+  SELECT id, nombre
+  FROM seccion
+  WHERE id = ${seccionId}
+    AND grado_id = ${gradoId}
+    AND estado = 1
+`;
+
+if (!seccion) return Astro.redirect(`/app/${bimestreId}/${gradoId}`);
+
+const [counts] = await query<{ alumnos: number; sesiones: number; consolidados: number }>`
+  SELECT
+    (SELECT COUNT(*) FROM alumno
+     WHERE seccion_id = ${seccionId} AND estado = 1)     AS alumnos,
+    (SELECT COUNT(*) FROM sesion
+     WHERE bimestre_id = ${bimestreId}
+       AND grado_id = ${gradoId} AND estado = 1)         AS sesiones,
+    (SELECT COUNT(*) FROM consolidado co
+     JOIN alumno a ON co.alumno_id = a.id
+     WHERE a.seccion_id = ${seccionId}
+       AND co.bimestre_id = ${bimestreId})               AS consolidados
+`;
+---
+
+<Layout title={`Sección ${seccion.nombre} — ${grado.nombre}`}>
+
+  <div class="mb-6">
+    <h1 class="text-xl font-semibold text-gray-900">
+      Sección {seccion.nombre}
+    </h1>
+    <p class="text-sm text-gray-400 mt-0.5">
+      {grado.nombre} · {bimestre.nombre} · {bimestre.anio}
+    </p>
+  </div>
+
+  <div class="flex flex-col gap-2">
+    <NavCard
+      href={`/app/${bimestreId}/${gradoId}/${seccionId}/alumnos`}
+      titulo="Alumnos"
+      subtitulo="Gestiona e importa la lista de alumnos"
+      meta={`${counts.alumnos} activo${counts.alumnos !== 1 ? 's' : ''}`}
+    />
+    <NavCard
+      href={`/app/${bimestreId}/${gradoId}/${seccionId}/sesiones`}
+      titulo="Sesiones"
+      subtitulo="Crea y administra las sesiones del bimestre"
+      meta={`${counts.sesiones} sesión${counts.sesiones !== 1 ? 'es' : ''}`}
+    />
+    <NavCard
+      href={`/app/${bimestreId}/${gradoId}/${seccionId}/consolidado`}
+      titulo="Consolidado"
+      subtitulo="Resumen de notas del bimestre"
+      meta={counts.consolidados > 0 ? 'Generado' : 'Pendiente'}
+    />
+  </div>
+
+</Layout>

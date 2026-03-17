@@ -1,0 +1,53 @@
+---
+import Layout from '../layouts/Layout.astro';
+import OnboardingForm from '../components/svelte/OnboardingForm.svelte';
+import { sql } from '../lib/db';
+
+const { googleProfile } = Astro.locals;
+const cursos = await sql<{
+  id: number;
+  nombre: string;
+  grados: { id: number; nombre: string }[];
+}[]>`
+  SELECT
+    c.id,
+    c.nombre,
+    COALESCE(
+      json_agg(
+        json_build_object('id', g.id, 'nombre', g.nombre)
+        ORDER BY g.nombre
+      ) FILTER (WHERE g.id IS NOT NULL),
+      '[]'
+    ) AS grados
+  FROM curso c
+  LEFT JOIN grado g ON g.curso_id = c.id
+  WHERE c.estado = 1
+    AND (g.estado = 1 OR g.id IS NULL)
+  GROUP BY c.id, c.nombre
+  ORDER BY c.nombre
+`;
+---
+
+<Layout title="Configuración inicial">
+  <div class="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4">
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 w-full max-w-lg">
+
+      <div class="mb-8">
+        <h1 class="text-2xl font-semibold text-gray-900">
+          Bienvenido, {googleProfile.nombre.split(' ')[0]}
+        </h1>
+        <p class="text-sm text-gray-500 mt-1">
+          Configura tu perfil docente para comenzar.
+          Solo necesitas hacerlo una vez.
+        </p>
+      </div>
+
+      <OnboardingForm
+        client:load
+        cursos={cursos}
+        googleProfile={googleProfile}
+      />
+
+    </div>
+  </div>
+</Layout>

@@ -1,0 +1,45 @@
+---
+// Construye el breadcrumb leyendo los segmentos de la URL
+// Las páginas le pasan labels legibles vía searchParams o headers
+// Por ahora usamos los segmentos directos — más adelante
+// cada página puede enriquecer con nombres reales desde la BD
+
+const pathname = Astro.url.pathname;
+const segments = pathname.split('/').filter(Boolean);
+
+interface Crumb {
+  label: string;
+  href: string;
+}
+
+const LABELS: Record<string, string> = {
+  app: '',          // segmento interno, no se muestra
+  alumnos: 'Alumnos',
+  sesiones: 'Sesiones',
+  consolidado: 'Consolidado',
+};
+
+const crumbs: Crumb[] = [{ label: 'Inicio', href: '/' }];
+
+let path = '';
+for (const seg of segments) {
+  if (seg === 'app') continue;    // carpeta interna, no aparece
+  path += `/${seg}`;
+  const label = LABELS[seg] ?? seg;  // si no hay label, muestra el ID
+  crumbs.push({ href: path, label });
+}
+---
+
+{crumbs.length > 1 && (
+  <nav class="flex items-center gap-1 text-xs text-gray-400">
+    {crumbs.map((crumb, i) => (
+      <span class="flex items-center gap-1">
+        {i > 0 && <span>/</span>}
+        {i === crumbs.length - 1
+          ? <span class="text-gray-600">{crumb.label}</span>
+          : <a href={crumb.href} class="hover:text-gray-600 transition-colors">{crumb.label}</a>
+        }
+      </span>
+    ))}
+  </nav>
+)}

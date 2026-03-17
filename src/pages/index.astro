@@ -1,11 +1,60 @@
 ---
-import Welcome from '../components/Welcome.astro';
 import Layout from '../layouts/Layout.astro';
+import NavCard from '../components/astro/NavCard.astro';
+import { sql } from '../lib/db';
+import type { Bimestre } from '../lib/types';
 
-// Welcome to Astro! Wondering what to do next? Check out the Astro documentation at https://docs.astro.build
-// Don't want to use any of this? Delete everything in this file, the `assets`, `components`, and `layouts` directories, and start fresh.
+const docente = Astro.locals.docente;
+
+const bimestres = await sql<Bimestre[]>`
+  SELECT id, nombre, orden, anio, estado
+  FROM bimestre
+  WHERE docente_id = ${docente.id}
+  ORDER BY anio DESC, orden ASC
+`;
+
+// Año actual para saber si hay que crear los bimestres del año
+const anioActual = new Date().getFullYear();
+const tieneAnioActual = bimestres.some(b => b.anio === anioActual);
 ---
 
-<Layout>
-	<Welcome />
+<Layout title="Inicio">
+
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-xl font-semibold text-gray-900">Mis bimestres</h1>
+
+    {!tieneAnioActual && (
+      <form method="POST" action="/api/bimestres">
+        <input type="hidden" name="anio" value={anioActual} />
+        <button
+          type="submit"
+          class="text-sm bg-blue-600 hover:bg-blue-700 text-white
+                 font-medium rounded-lg px-4 py-2 transition-colors cursor-pointer"
+        >
+          Iniciar año {anioActual}
+        </button>
+      </form>
+    )}
+  </div>
+
+  {bimestres.length === 0 ? (
+    <div class="text-center py-16 text-gray-400">
+      <p class="text-sm">Aún no tienes bimestres creados.</p>
+      <p class="text-sm mt-1">
+        Haz clic en <strong class="text-gray-600">Iniciar año {anioActual}</strong> para comenzar.
+      </p>
+    </div>
+  ) : (
+    <div class="flex flex-col gap-2">
+      {bimestres.map(b => (
+        <NavCard
+          href={`/app/${b.id}`}
+          titulo={b.nombre}
+          subtitulo={`Año ${b.anio}`}
+          meta={b.estado === 1 ? 'Activo' : 'Inactivo'}
+        />
+      ))}
+    </div>
+  )}
+
 </Layout>

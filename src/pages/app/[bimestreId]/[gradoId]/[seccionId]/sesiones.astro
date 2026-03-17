@@ -1,0 +1,78 @@
+---
+import Layout from '../../../../../layouts/Layout.astro';
+import SesionList from '../../../../../components/svelte/SesionList.svelte';
+import { query } from '../../../../../lib/db';
+import { getCurriculoPorNombre } from '../../../../../lib/curriculo/index';
+import type { Bimestre, Grado, Seccion, Sesion, SesionCriterio } from '../../../../../lib/types';
+
+const docente = Astro.locals.docente;
+const { bimestreId, gradoId, seccionId } = Astro.params;
+if (!bimestreId || !gradoId || !seccionId) return Astro.redirect('/');
+
+const [bimestre] = await query<Bimestre>`
+  SELECT id, nombre, anio FROM bimestre
+  WHERE id = ${bimestreId} AND docente_id = ${docente.id}
+`;
+if (!bimestre) return Astro.redirect('/');
+
+const [grado] = await query<Grado>`
+  SELECT g.id, g.nombre FROM grado g
+  JOIN docente_grado dg ON dg.grado_id = g.id
+  WHERE g.id = ${gradoId} AND dg.docente_id = ${docente.id} AND g.estado = 1
+`;
+if (!grado) return Astro.redirect(`/app/${bimestreId}`);
+
+const [seccion] = await query<Seccion>`
+  SELECT id, nombre FROM seccion
+  WHERE id = ${seccionId} AND grado_id = ${gradoId} AND estado = 1
+`;
+if (!seccion) return Astro.redirect(`/app/${bimestreId}/${gradoId}`);
+
+const sesiones = await query<Sesion & { criterios: SesionCriterio[] }>`
+  SELECT
+    s.id, s.titulo, s.producto, s.fecha, s.estado,
+    COALESCE(
+      json_agg(
+        json_build_object(
+          'id',            sc.id,
+          'competenciaId', sc.competencia_id,
+          'capacidadId',   sc.capacidad_id,
+          'criterio',      sc.criterio,
+          'orden',         sc.orden
+        ) ORDER BY sc.orden
+      ) FILTER (WHERE sc.id IS NOT NULL),
+      '[]'
+    ) AS criterios
+  FROM sesion s
+  LEFT JOIN sesion_criterio sc ON sc.sesion_id = s.id
+  WHERE s.bimestre_id = ${bimestreId}
+    AND s.grado_id    = ${gradoId}
+  GROUP BY s.id
+  ORDER BY s.fecha ASC
+`;
+
+const [cursoDocente] = await query<{ nombre: string }>`
+  SELECT nombre FROM curso WHERE id = ${docente.cursoId}
+`;
+const curriculo = cursoDocente ? getCurriculoPorNombre(cursoDocente.nombre) : null;
+---
+
+<Layout title={`Sesiones — Sección ${seccion.nombre}`}>
+  <div class="mb-6">
+    <h1 class="text-xl font-semibold text-gray-900">
+      Sesiones · Sección {seccion.nombre}
+    </h1>
+    <p class="text-sm text-gray-400 mt-0.5">
+      {grado.nombre} · {bimestre.nombre} · {bimestre.anio}
+    </p>
+  </div>
+
+  <SesionList
+    client:load
+    sesiones={sesiones}
+    curriculo={curriculo}
+    bimestreId={Number(bimestreId)}
+    gradoId={Number(gradoId)}
+    seccionId={Number(seccionId)}
+  />
+</Layout>

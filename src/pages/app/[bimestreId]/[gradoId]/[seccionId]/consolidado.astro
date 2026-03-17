@@ -1,0 +1,98 @@
+---
+import Layout from '../../../../../layouts/Layout.astro';
+import { query } from '../../../../../lib/db';
+import type { Bimestre, Grado, Seccion, Alumno, Sesion, Evaluacion, Consolidado as ConsolidadoType } from '../../../../../lib/types';
+import { getCurriculoPorNombre } from '../../../../../lib/curriculo/index';
+
+const docente = Astro.locals.docente;
+const { bimestreId, gradoId, seccionId } = Astro.params;
+if (!bimestreId || !gradoId || !seccionId) return Astro.redirect('/');
+
+const [bimestre] = await query<Bimestre>`
+  SELECT id, nombre, anio FROM bimestre
+  WHERE id = ${bimestreId} AND docente_id = ${docente.id}
+`;
+if (!bimestre) return Astro.redirect('/');
+
+const [grado] = await query<Grado>`
+  SELECT g.id, g.nombre FROM grado g
+  JOIN docente_grado dg ON dg.grado_id = g.id
+  WHERE g.id = ${gradoId} AND dg.docente_id = ${docente.id} AND g.estado = 1
+`;
+if (!grado) return Astro.redirect(`/app/${bimestreId}`);
+
+const [seccion] = await query<Seccion>`
+  SELECT id, nombre FROM seccion
+  WHERE id = ${seccionId} AND grado_id = ${gradoId} AND estado = 1
+`;
+if (!seccion) return Astro.redirect(`/app/${bimestreId}/${gradoId}`);
+
+// Alumnos activos de la sección
+const alumnos = await query<Alumno>`
+  SELECT id, orden, nombre, apellido
+  FROM alumno
+  WHERE seccion_id = ${seccionId} AND estado = 1
+  ORDER BY orden ASC, apellido ASC
+`;
+
+// Sesiones activas del bimestre para este grado
+const sesiones = await query<Sesion>`
+  SELECT id, titulo, competencia_id AS "competenciaId",
+         capacidad_id AS "capacidadId", criterio, fecha
+  FROM sesion
+  WHERE bimestre_id = ${bimestreId}
+    AND grado_id    = ${gradoId}
+    AND estado = 1
+  ORDER BY fecha ASC
+`;
+
+// Todas las evaluaciones de estos alumnos en estas sesiones
+const evaluaciones = await query<Evaluacion>`
+  SELECT e.sesion_id AS "sesionId", e.alumno_id AS "alumnoId", e.nota
+  FROM evaluacion e
+  JOIN sesion s ON e.sesion_id = s.id
+  JOIN alumno a ON e.alumno_id = a.id
+  WHERE s.bimestre_id  = ${bimestreId}
+    AND s.grado_id     = ${gradoId}
+    AND a.seccion_id   = ${seccionId}
+`;
+
+// Consolidados ya guardados
+const consolidados = await query<{ alumnoId: number; notaFinal: string }>`
+  SELECT co.alumno_id AS "alumnoId", co.nota_final AS "notaFinal"
+  FROM consolidado co
+  JOIN alumno a ON co.alumno_id = a.id
+  WHERE co.bimestre_id = ${bimestreId}
+    AND a.seccion_id   = ${seccionId}
+`;
+
+// Currículo para nombres
+const [cursoDocente] = await query<{ nombre: string }>`
+  SELECT nombre FROM curso WHERE id = ${docente.cursoId}
+`;
+const curriculo = cursoDocente ? getCurriculoPorNombre(cursoDocente.nombre) : null;
+---
+
+<Layout title={`Consolidado — Sección ${seccion.nombre}`}>
+
+  <div class="mb-6">
+    <h1 class="text-xl font-semibold text-gray-900">
+      Consolidado · Sección {seccion.nombre}
+    </h1>
+    <p class="text-sm text-gray-400 mt-0.5">
+      {grado.nombre} · {bimestre.nombre} · {bimestre.anio}
+    </p>
+  </div>
+
+  <Consolidado
+    client:load
+    alumnos={alumnos}
+    sesiones={sesiones}
+    evaluaciones={evaluaciones}
+    consolidadosIniciales={consolidados}
+    curriculo={curriculo}
+    bimestreId={Number(bimestreId)}
+    seccionId={Number(seccionId)}
+  />
+
+</Layout>

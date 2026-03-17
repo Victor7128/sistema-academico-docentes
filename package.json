@@ -12,6 +12,19 @@
     "astro": "astro"
   },
   "dependencies": {
-    "astro": "^6.0.5"
+    "@astrojs/node": "^10.0.2",
+    "@astrojs/svelte": "^8.0.1",
+    "@auth/core": "^0.37.4",
+    "@tailwindcss/vite": "^4.2.1",
+    "astro": "^6.0.5",
+    "auth-astro": "^4.2.0",
+    "dotenv": "^17.3.1",
+    "postgres": "^3.4.8",
+    "svelte": "^5.53.12",
+    "tailwindcss": "^4.2.1",
+    "typescript": "^5.9.3"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0"
   }
 }

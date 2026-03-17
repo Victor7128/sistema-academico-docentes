@@ -1,0 +1,62 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import NavCard from '../../../components/astro/NavCard.astro';
+import { query } from '../../../lib/db';
+import type { Bimestre, Grado } from '../../../lib/types';
+
+const docente = Astro.locals.docente;
+const { bimestreId } = Astro.params;
+if (!bimestreId) return Astro.redirect('/');
+
+const [bimestre] = await query<Bimestre>`
+  SELECT id, nombre, orden, anio, estado
+  FROM bimestre
+  WHERE id = ${bimestreId}
+    AND docente_id = ${docente.id}
+`;
+
+if (!bimestre) return Astro.redirect('/');
+
+const grados = await query<Grado>`
+  SELECT g.id, g.nombre
+  FROM grado g
+  JOIN docente_grado dg ON dg.grado_id = g.id
+  WHERE dg.docente_id = ${docente.id}
+    AND g.estado = 1
+  ORDER BY g.nombre
+`;
+---
+
+<Layout title={bimestre.nombre}>
+
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-xl font-semibold text-gray-900">{bimestre.nombre}</h1>
+      <p class="text-sm text-gray-400 mt-0.5">Año {bimestre.anio}</p>
+    </div>
+    <span class={`text-xs font-medium px-2.5 py-1 rounded-full
+      ${bimestre.estado === 1
+        ? 'bg-green-50 text-green-700 border border-green-200'
+        : 'bg-gray-100 text-gray-500 border border-gray-200'}`}>
+      {bimestre.estado === 1 ? 'Activo' : 'Inactivo'}
+    </span>
+  </div>
+
+  {grados.length === 0 ? (
+    <div class="text-center py-16 text-gray-400">
+      <p class="text-sm">No tienes grados asignados.</p>
+      <p class="text-sm mt-1">Contacta al administrador del sistema.</p>
+    </div>
+  ) : (
+    <div class="flex flex-col gap-2">
+      {grados.map(g => (
+        <NavCard
+          href={`/app/${bimestre.id}/${g.id}`}
+          titulo={g.nombre}
+          subtitulo="Ver secciones"
+        />
+      ))}
+    </div>
+  )}
+
+</Layout>

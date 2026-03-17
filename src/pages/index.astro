@@ -19,33 +19,91 @@ const tieneAnioActual = bimestres.some(b => b.anio === anioActual);
 ---
 
 <Layout title="Inicio">
+  <style>
+    .idx-headline { font-family: 'DM Serif Display', serif; }
 
-  <div class="flex items-center justify-between mb-6">
-    <h1 class="text-xl font-semibold text-gray-900">Mis bimestres</h1>
+    .idx-btn-initiar {
+      font-size: .84rem;
+      font-weight: 500;
+      background: #1B3A6B;
+      color: #ffffff;
+      border: none;
+      border-radius: .75rem;
+      padding: .6rem 1.1rem;
+      cursor: pointer;
+      transition: background .2s, transform .15s, box-shadow .2s;
+      box-shadow: 0 3px 12px rgba(27,58,107,.25);
+      letter-spacing: .01em;
+    }
+    .idx-btn-initiar:hover {
+      background: #2A5298;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(27,58,107,.28);
+    }
+    .idx-btn-initiar:active {
+      transform: translateY(0);
+      box-shadow: 0 2px 6px rgba(27,58,107,.2);
+    }
+
+    .idx-empty {
+      text-align: center;
+      padding: 4rem 1rem;
+      border: 1.5px dashed #DDE3EE;
+      border-radius: 1rem;
+      background: #F5F3EE;
+    }
+    .idx-empty-icon {
+      width: 48px; height: 48px;
+      border-radius: .875rem;
+      background: #EEF2F9;
+      border: 1px solid rgba(27,58,107,.12);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1rem;
+    }
+
+    .idx-card-list { display: flex; flex-direction: column; gap: .625rem; }
+  </style>
+
+  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.75rem;">
+    <div>
+      <h1 class="idx-headline" style="font-size: 1.6rem; color: #1A2332; line-height: 1.1;">
+        Mis bimestres
+      </h1>
+      <p style="font-size: .8rem; color: #8A96AA; margin-top: .2rem;">
+        Gestión del año escolar
+      </p>
+    </div>
 
     {!tieneAnioActual && (
       <form method="POST" action="/api/bimestres">
         <input type="hidden" name="anio" value={anioActual} />
-        <button
-          type="submit"
-          class="text-sm bg-blue-600 hover:bg-blue-700 text-white
-                 font-medium rounded-lg px-4 py-2 transition-colors cursor-pointer"
-        >
-          Iniciar año {anioActual}
+        <button type="submit" class="idx-btn-initiar">
+          + Iniciar año {anioActual}
         </button>
       </form>
     )}
   </div>
 
   {bimestres.length === 0 ? (
-    <div class="text-center py-16 text-gray-400">
-      <p class="text-sm">Aún no tienes bimestres creados.</p>
-      <p class="text-sm mt-1">
-        Haz clic en <strong class="text-gray-600">Iniciar año {anioActual}</strong> para comenzar.
+    <div class="idx-empty">
+      <div class="idx-empty-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <rect x="3" y="4" width="18" height="18" rx="2" stroke="#1B3A6B" stroke-width="1.5"/>
+          <path d="M3 9h18" stroke="#1B3A6B" stroke-width="1.5" stroke-linecap="round"/>
+          <path d="M8 2v4M16 2v4" stroke="#1B3A6B" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <p style="font-size: .875rem; color: #4A5672; margin-bottom: .35rem; font-weight: 500;">
+        Aún no tienes bimestres creados.
+      </p>
+      <p style="font-size: .82rem; color: #8A96AA; line-height: 1.55;">
+        Haz clic en <strong style="color: #1B3A6B; font-weight: 500;">Iniciar año {anioActual}</strong> para comenzar.
       </p>
     </div>
   ) : (
-    <div class="flex flex-col gap-2">
+    <div class="idx-card-list">
       {bimestres.map(b => (
         <NavCard
           href={`/app/${b.id}`}

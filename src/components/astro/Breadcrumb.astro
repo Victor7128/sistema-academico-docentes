@@ -1,19 +1,14 @@
 ---
-// Construye el breadcrumb leyendo los segmentos de la URL
-// Las páginas le pasan labels legibles vía searchParams o headers
-// Por ahora usamos los segmentos directos — más adelante
-// cada página puede enriquecer con nombres reales desde la BD
-
 const pathname = Astro.url.pathname;
 const segments = pathname.split('/').filter(Boolean);
 
-interface Crumb {
-  label: string;
-  href: string;
-}
+const tieneIds = segments.some(s => /^\d+$/.test(s));
+if (tieneIds) return;
+
+interface Crumb { label: string; href: string; }
 
 const LABELS: Record<string, string> = {
-  app: '',          // segmento interno, no se muestra
+  app: '',
   alumnos: 'Alumnos',
   sesiones: 'Sesiones',
   consolidado: 'Consolidado',
@@ -23,23 +18,32 @@ const crumbs: Crumb[] = [{ label: 'Inicio', href: '/' }];
 
 let path = '';
 for (const seg of segments) {
-  if (seg === 'app') continue;    // carpeta interna, no aparece
+  if (seg === 'app') continue;
   path += `/${seg}`;
-  const label = LABELS[seg] ?? seg;  // si no hay label, muestra el ID
+  const label = LABELS[seg] ?? seg;
   crumbs.push({ href: path, label });
 }
 ---
 
 {crumbs.length > 1 && (
-  <nav class="flex items-center gap-1 text-xs text-gray-400">
+  <nav class="bc">
     {crumbs.map((crumb, i) => (
-      <span class="flex items-center gap-1">
-        {i > 0 && <span>/</span>}
+      <span class="bc__item">
+        {i > 0 && <span class="bc__sep">›</span>}
         {i === crumbs.length - 1
-          ? <span class="text-gray-600">{crumb.label}</span>
-          : <a href={crumb.href} class="hover:text-gray-600 transition-colors">{crumb.label}</a>
+          ? <span class="bc__current">{crumb.label}</span>
+          : <a href={crumb.href} class="bc__link">{crumb.label}</a>
         }
       </span>
     ))}
   </nav>
 )}
+
+<style>
+  .bc { display: flex; align-items: center; flex-wrap: wrap; gap: .25rem; font-size: .73rem; }
+  .bc__item { display: flex; align-items: center; gap: .25rem; }
+  .bc__sep { color: #C8D3E8; user-select: none; }
+  .bc__link { color: #8A96AA; text-decoration: none; transition: color .15s; }
+  .bc__link:hover { color: #1B3A6B; }
+  .bc__current { color: #4A5672; font-weight: 500; }
+</style>

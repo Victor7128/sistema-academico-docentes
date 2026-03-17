@@ -1,8 +1,9 @@
 ---
 import Layout from '../../../../../layouts/Layout.astro';
+import ConsolidadoForm from '../../../../../components/svelte/Consolidado.svelte';
 import { query } from '../../../../../lib/db';
-import type { Bimestre, Grado, Seccion, Alumno, Sesion, Evaluacion, Consolidado as ConsolidadoType } from '../../../../../lib/types';
 import { getCurriculoPorNombre } from '../../../../../lib/curriculo/index';
+import type { Bimestre, Grado, Seccion, Alumno, Sesion, SesionCriterio } from '../../../../../lib/types';
 
 const docente = Astro.locals.docente;
 const { bimestreId, gradoId, seccionId } = Astro.params;
@@ -27,7 +28,7 @@ const [seccion] = await query<Seccion>`
 `;
 if (!seccion) return Astro.redirect(`/app/${bimestreId}/${gradoId}`);
 
-// Alumnos activos de la sección
+// Alumnos activos
 const alumnos = await query<Alumno>`
   SELECT id, orden, nombre, apellido
   FROM alumno
@@ -35,29 +36,53 @@ const alumnos = await query<Alumno>`
   ORDER BY orden ASC, apellido ASC
 `;
 
-// Sesiones activas del bimestre para este grado
-const sesiones = await query<Sesion>`
-  SELECT id, titulo, competencia_id AS "competenciaId",
-         capacidad_id AS "capacidadId", criterio, fecha
-  FROM sesion
-  WHERE bimestre_id = ${bimestreId}
-    AND grado_id    = ${gradoId}
-    AND estado = 1
-  ORDER BY fecha ASC
+// Sesiones activas del bimestre con sus criterios
+const sesiones = await query<Sesion & { criterios: SesionCriterio[] }>`
+  SELECT
+    s.id, s.titulo, s.fecha,
+    COALESCE(
+      json_agg(
+        json_build_object(
+          'id',            sc.id,
+          'competenciaId', sc.competencia_id,
+          'capacidadId',   sc.capacidad_id,
+          'criterio',      sc.criterio,
+          'orden',         sc.orden
+        ) ORDER BY sc.orden
+      ) FILTER (WHERE sc.id IS NOT NULL),
+      '[]'
+    ) AS criterios
+  FROM sesion s
+  LEFT JOIN sesion_criterio sc ON sc.sesion_id = s.id
+  WHERE s.bimestre_id = ${bimestreId}
+    AND s.grado_id    = ${gradoId}
+    AND s.estado      = 1
+  GROUP BY s.id
+  ORDER BY s.fecha ASC
 `;
 
-// Todas las evaluaciones de estos alumnos en estas sesiones
-const evaluaciones = await query<Evaluacion>`
-  SELECT e.sesion_id AS "sesionId", e.alumno_id AS "alumnoId", e.nota
+// Evaluaciones de los alumnos de esta sección en este bimestre
+const evaluaciones = await query<{
+  sesionCriterioId: number;
+  sesionId: number;
+  alumnoId: number;
+  nota: string;
+}>`
+  SELECT
+    e.sesion_criterio_id AS "sesionCriterioId",
+    sc.sesion_id         AS "sesionId",
+    e.alumno_id          AS "alumnoId",
+    e.nota
   FROM evaluacion e
-  JOIN sesion s ON e.sesion_id = s.id
-  JOIN alumno a ON e.alumno_id = a.id
+  JOIN sesion_criterio sc ON e.sesion_criterio_id = sc.id
+  JOIN sesion s           ON sc.sesion_id = s.id
+  JOIN alumno a           ON e.alumno_id  = a.id
   WHERE s.bimestre_id  = ${bimestreId}
     AND s.grado_id     = ${gradoId}
     AND a.seccion_id   = ${seccionId}
 `;
 
-// Consolidados ya guardados
+// Consolidados ya calculados
 const consolidados = await query<{ alumnoId: number; notaFinal: string }>`
   SELECT co.alumno_id AS "alumnoId", co.nota_final AS "notaFinal"
   FROM consolidado co
@@ -66,7 +91,6 @@ const consolidados = await query<{ alumnoId: number; notaFinal: string }>`
     AND a.seccion_id   = ${seccionId}
 `;
 
-// Currículo para nombres
 const [cursoDocente] = await query<{ nombre: string }>`
   SELECT nombre FROM curso WHERE id = ${docente.cursoId}
 `;
@@ -74,17 +98,31 @@ const curriculo = cursoDocente ? getCurriculoPorNombre(cursoDocente.nombre) : nu
 ---
 
 <Layout title={`Consolidado — Sección ${seccion.nombre}`}>
+  <style>
+    .ph { font-family: 'DM Serif Display', serif; font-size: clamp(1.35rem, 3vw, 1.7rem); color: #1A2332; line-height: 1.15; }
+    .pm { font-size: .78rem; color: #8A96AA; margin-top: .2rem; }
+    .pbc { display: flex; align-items: center; gap: .3rem; font-size: .72rem; flex-wrap: wrap; margin-bottom: .6rem; }
+    .pbc a { color: #8A96AA; text-decoration: none; transition: color .15s; }
+    .pbc a:hover { color: #1B3A6B; }
+    .pbc-sep { color: #C8D3E8; }
+    .pbc-cur { color: #4A5672; font-weight: 500; }
+  </style>
 
-  <div class="mb-6">
-    <h1 class="text-xl font-semibold text-gray-900">
-      Consolidado · Sección {seccion.nombre}
-    </h1>
-    <p class="text-sm text-gray-400 mt-0.5">
-      {grado.nombre} · {bimestre.nombre} · {bimestre.anio}
-    </p>
+  <div style="margin-bottom:1.5rem;">
+    <nav class="pbc">
+      <a href={`/app/${bimestreId}`}>{bimestre.nombre} {bimestre.anio}</a>
+      <span class="pbc-sep">›</span>
+      <a href={`/app/${bimestreId}/${gradoId}`}>{grado.nombre}</a>
+      <span class="pbc-sep">›</span>
+      <a href={`/app/${bimestreId}/${gradoId}/${seccionId}`}>Sección {seccion.nombre}</a>
+      <span class="pbc-sep">›</span>
+      <span class="pbc-cur">Consolidado</span>
+    </nav>
+    <h1 class="ph">Consolidado <span style="font-style:italic;color:#C8882A;">· Sección {seccion.nombre}</span></h1>
+    <p class="pm">{grado.nombre} · {bimestre.nombre} {bimestre.anio}</p>
   </div>
 
-  <Consolidado
+  <ConsolidadoForm
     client:load
     alumnos={alumnos}
     sesiones={sesiones}
@@ -93,6 +131,8 @@ const curriculo = cursoDocente ? getCurriculoPorNombre(cursoDocente.nombre) : nu
     curriculo={curriculo}
     bimestreId={Number(bimestreId)}
     seccionId={Number(seccionId)}
+    seccionNombre={seccion.nombre}
+    gradoNombre={grado.nombre}
+    bimestreNombre={`${bimestre.nombre} ${bimestre.anio}`}
   />
-
 </Layout>

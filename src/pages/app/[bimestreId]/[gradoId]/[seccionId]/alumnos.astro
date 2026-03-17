@@ -33,23 +33,63 @@ const alumnos = await query<Alumno>`
   WHERE seccion_id = ${seccionId}
   ORDER BY orden ASC, apellido ASC, nombre ASC
 `;
+
+// Secciones del mismo grado y nombre en otros bimestres del docente
+// con al menos 1 alumno activo → para la función "Copiar alumnos"
+// Otras secciones del mismo grado y nombre con alumnos activos
+// (seccion no tiene bimestre_id — son por grado, no por bimestre)
+const seccionesOrigen = await query<{
+  seccionId: number;
+  seccionNombre: string;
+  totalAlumnos: number;
+}>`
+  SELECT
+    s.id        AS "seccionId",
+    s.nombre    AS "seccionNombre",
+    COUNT(a.id) AS "totalAlumnos"
+  FROM seccion s
+  JOIN alumno a ON a.seccion_id = s.id AND a.estado = 1
+  JOIN docente_grado dg ON dg.grado_id = s.grado_id
+  WHERE s.grado_id  = ${gradoId}
+    AND s.nombre    = ${seccion.nombre}
+    AND s.id       != ${seccionId}
+    AND dg.docente_id = ${docente.id}
+  GROUP BY s.id, s.nombre
+  HAVING COUNT(a.id) > 0
+  ORDER BY COUNT(a.id) DESC
+`;
 ---
 
 <Layout title={`Alumnos — Sección ${seccion.nombre}`}>
+  <style>
+    .ph { font-family: 'DM Serif Display', serif; font-size: clamp(1.35rem, 3vw, 1.7rem); color: #1A2332; line-height: 1.15; }
+    .pm { font-size: .78rem; color: #8A96AA; margin-top: .2rem; }
+    .pbc { display: flex; align-items: center; gap: .3rem; font-size: .72rem; flex-wrap: wrap; margin-bottom: .6rem; }
+    .pbc a { color: #8A96AA; text-decoration: none; transition: color .15s; }
+    .pbc a:hover { color: #1B3A6B; }
+    .pbc-sep { color: #C8D3E8; }
+    .pbc-cur { color: #4A5672; font-weight: 500; }
+  </style>
 
-  <div class="mb-6">
-    <h1 class="text-xl font-semibold text-gray-900">
-      Alumnos · Sección {seccion.nombre}
-    </h1>
-    <p class="text-sm text-gray-400 mt-0.5">
-      {grado.nombre} · {bimestre.nombre} · {bimestre.anio}
-    </p>
+  <div style="margin-bottom:1.5rem;">
+    <nav class="pbc">
+      <a href={`/app/${bimestreId}`}>{bimestre.nombre} {bimestre.anio}</a>
+      <span class="pbc-sep">›</span>
+      <a href={`/app/${bimestreId}/${gradoId}`}>{grado.nombre}</a>
+      <span class="pbc-sep">›</span>
+      <a href={`/app/${bimestreId}/${gradoId}/${seccionId}`}>Sección {seccion.nombre}</a>
+      <span class="pbc-sep">›</span>
+      <span class="pbc-cur">Alumnos</span>
+    </nav>
+    <h1 class="ph">Alumnos <span style="font-style:italic;color:#C8882A;">· Sección {seccion.nombre}</span></h1>
+    <p class="pm">{grado.nombre} · {bimestre.nombre} {bimestre.anio}</p>
   </div>
 
   <AlumnosCRUD
     client:load
     alumnos={alumnos}
     seccionId={Number(seccionId)}
+    seccionesOrigen={seccionesOrigen}
   />
 
 </Layout>

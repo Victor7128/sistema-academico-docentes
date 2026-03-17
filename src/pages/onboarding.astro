@@ -29,14 +29,86 @@ const cursos = await sql<{
 ---
 
 <Layout title="Configuración inicial">
-  <div class="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4">
-    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 w-full max-w-lg">
+  <style>
+    .onb-headline { font-family: 'DM Serif Display', serif; }
+    .onb-wrap {
+      min-height: 100vh;
+      background-color: #F5F3EE;
+      background-image: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 47px,
+        rgba(27,58,107,.04) 47px,
+        rgba(27,58,107,.04) 48px
+      );
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 1rem;
+    }
+    .onb-card {
+      background: #ffffff;
+      border-radius: 1.25rem;
+      border: 1px solid #DDE3EE;
+      padding: 2.5rem 2.25rem;
+      width: 100%;
+      max-width: 480px;
+      box-shadow: 0 4px 24px rgba(27,58,107,.08);
+    }
+    .onb-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: .875rem;
+      background: #EEF2F9;
+      border: 1px solid rgba(27,58,107,.12);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1.5rem;
+    }
+    .onb-step {
+      display: inline-flex;
+      align-items: center;
+      gap: .45rem;
+      font-size: .68rem;
+      font-weight: 500;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: #C8882A;
+      border: 1px solid rgba(200,136,42,.28);
+      border-radius: 2rem;
+      padding: .3rem .85rem;
+      margin-bottom: 1.25rem;
+    }
+    .onb-step::before {
+      content: '';
+      display: block;
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: #C8882A;
+    }
+    @media (max-width: 520px) {
+      .onb-card { padding: 1.75rem 1.25rem; border-radius: 1rem; }
+    }
+  </style>
 
-      <div class="mb-8">
-        <h1 class="text-2xl font-semibold text-gray-900">
-          Bienvenido, {googleProfile.nombre.split(' ')[0]}
+  <div class="onb-wrap">
+    <div class="onb-card">
+
+      <div class="onb-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="#1B3A6B" stroke-width="1.5" stroke-linecap="round"/>
+          <circle cx="12" cy="7" r="4" stroke="#1B3A6B" stroke-width="1.5"/>
+        </svg>
+      </div>
+
+      <div class="onb-step">Configuración inicial</div>
+
+      <div style="margin-bottom: 2rem;">
+        <h1 class="onb-headline" style="font-size: 1.75rem; color: #1A2332; line-height: 1.15; margin-bottom: .4rem;">
+          Hola, {googleProfile.nombre.split(' ')[0]}
         </h1>
-        <p class="text-sm text-gray-500 mt-1">
+        <p style="font-size: .875rem; color: #4A5672; line-height: 1.65; font-weight: 300;">
           Configura tu perfil docente para comenzar.
           Solo necesitas hacerlo una vez.
         </p>

@@ -2,12 +2,22 @@
 import Layout from '../../../../../../layouts/Layout.astro';
 import EvaluacionForm from '../../../../../../components/svelte/EvaluacionForm.svelte';
 import { query } from '../../../../../../lib/db';
-import type { Bimestre, Grado, Seccion, Sesion, Alumno, Evaluacion } from '../../../../../../lib/types';
 import { getCurriculoPorNombre } from '../../../../../../lib/curriculo/index';
+import type {
+  Bimestre,
+  Grado,
+  Seccion,
+  Sesion,
+  SesionCriterio,
+  Alumno,
+  Evaluacion,
+} from '../../../../../../lib/types';
 
 const docente = Astro.locals.docente;
 const { bimestreId, gradoId, seccionId, sesionId } = Astro.params;
 if (!bimestreId || !gradoId || !seccionId || !sesionId) return Astro.redirect('/');
+
+// ── Verificar acceso ──────────────────────────────────────────────────────
 
 const [bimestre] = await query<Bimestre>`
   SELECT id, nombre, anio FROM bimestre
@@ -28,89 +38,100 @@ const [seccion] = await query<Seccion>`
 `;
 if (!seccion) return Astro.redirect(`/app/${bimestreId}/${gradoId}`);
 
-const [sesion] = await query<Sesion>`
-  SELECT id, titulo, producto, competencia_id AS "competenciaId",
-         capacidad_id AS "capacidadId", criterio, fecha, estado
-  FROM sesion
-  WHERE id = ${sesionId}
-    AND bimestre_id = ${bimestreId}
-    AND grado_id    = ${gradoId}
-    AND estado = 1
-`;
-if (!sesion) return Astro.redirect(`/app/${bimestreId}/${gradoId}/${seccionId}/sesiones`);
+// ── Sesión con sus criterios ──────────────────────────────────────────────
 
-// Alumnos activos de la sección
+const [sesion] = await query<Sesion & { criterios: SesionCriterio[] }>`
+  SELECT
+    s.id, s.titulo, s.producto, s.fecha, s.estado,
+    COALESCE(
+      json_agg(
+        json_build_object(
+          'id',            sc.id,
+          'competenciaId', sc.competencia_id,
+          'capacidadId',   sc.capacidad_id,
+          'criterio',      sc.criterio,
+          'orden',         sc.orden
+        ) ORDER BY sc.orden
+      ) FILTER (WHERE sc.id IS NOT NULL),
+      '[]'
+    ) AS criterios
+  FROM sesion s
+  LEFT JOIN sesion_criterio sc ON sc.sesion_id = s.id
+  WHERE s.id = ${sesionId}
+    AND s.bimestre_id = ${bimestreId}
+    AND s.grado_id    = ${gradoId}
+  GROUP BY s.id
+`;
+if (!sesion || sesion.estado === 0)
+  return Astro.redirect(`/app/${bimestreId}/${gradoId}/${seccionId}/sesiones`);
+
+// ── Alumnos de la sección ─────────────────────────────────────────────────
+
 const alumnos = await query<Alumno>`
-  SELECT id, orden, nombre, apellido, codigo
+  SELECT id, nombre, apellido, orden
   FROM alumno
   WHERE seccion_id = ${seccionId} AND estado = 1
-  ORDER BY orden ASC, apellido ASC
+  ORDER BY orden ASC, apellido ASC, nombre ASC
 `;
 
-// Evaluaciones ya registradas para esta sesión
+// ── Evaluaciones existentes ───────────────────────────────────────────────
+
 const evaluaciones = await query<Evaluacion>`
-  SELECT id, alumno_id AS "alumnoId", nota, observacion
-  FROM evaluacion
-  WHERE sesion_id = ${sesionId}
+  SELECT
+    e.id,
+    e.sesion_criterio_id AS "sesionCriterioId",
+    e.alumno_id          AS "alumnoId",
+    e.nota,
+    e.observacion
+  FROM evaluacion e
+  JOIN sesion_criterio sc ON e.sesion_criterio_id = sc.id
+  WHERE sc.sesion_id = ${sesionId}
 `;
 
-// Currículo para mostrar nombre de competencia y capacidad
+// ── Currículo ─────────────────────────────────────────────────────────────
+
 const [cursoDocente] = await query<{ nombre: string }>`
   SELECT nombre FROM curso WHERE id = ${docente.cursoId}
 `;
 const curriculo = cursoDocente ? getCurriculoPorNombre(cursoDocente.nombre) : null;
-
-// Armar mapa alumnoId → evaluacion para pasarlo al componente
-const mapaEvaluaciones: Record<number, { nota: string; observacion: string | null }> = {};
-for (const ev of evaluaciones) {
-  mapaEvaluaciones[ev.alumnoId] = { nota: ev.nota, observacion: ev.observacion };
-}
-
-function nombreCompetencia(id: string) {
-  return curriculo?.competencias.find(c => String(c.id) === String(id))?.nombre ?? id;
-}
-function nombreCapacidad(compId: string, capId: string) {
-  const comp = curriculo?.competencias.find(c => String(c.id) === String(compId));
-  return comp?.capacidades.find((cap: any) => String(cap.id) === String(capId))?.nombre ?? capId;
-}
 ---
 
-<Layout title={`Evaluar — ${sesion.titulo}`}>
+<Layout title={`Evaluación — ${sesion.titulo}`}>
+  <style>
+    .ph { font-family: 'DM Serif Display', serif; font-size: clamp(1.3rem, 3vw, 1.65rem); color: #1A2332; line-height: 1.2; }
+    .pm { font-size: .78rem; color: #8A96AA; margin-top: .2rem; }
+    .pbc { display: flex; align-items: center; gap: .3rem; font-size: .72rem; flex-wrap: wrap; margin-bottom: .6rem; }
+    .pbc a { color: #8A96AA; text-decoration: none; transition: color .15s; }
+    .pbc a:hover { color: #1B3A6B; }
+    .pbc-sep { color: #C8D3E8; }
+    .pbc-cur { color: #4A5672; font-weight: 500; }
+  </style>
 
-  <div class="mb-6">
-    <h1 class="text-xl font-semibold text-gray-900 leading-snug">
-      {sesion.titulo}
-    </h1>
-    <p class="text-sm text-gray-400 mt-0.5">
-      Sección {seccion.nombre} · {grado.nombre} · {bimestre.nombre} · {bimestre.anio}
+  <div style="margin-bottom:1.5rem;">
+    <nav class="pbc">
+      <a href={`/app/${bimestreId}`}>{bimestre.nombre} {bimestre.anio}</a>
+      <span class="pbc-sep">›</span>
+      <a href={`/app/${bimestreId}/${gradoId}`}>{grado.nombre}</a>
+      <span class="pbc-sep">›</span>
+      <a href={`/app/${bimestreId}/${gradoId}/${seccionId}/sesiones`}>Sección {seccion.nombre}</a>
+      <span class="pbc-sep">›</span>
+      <span class="pbc-cur">Evaluación</span>
+    </nav>
+    <h1 class="ph">{sesion.titulo}</h1>
+    <p class="pm">
+      {new Date(sesion.fecha + 'T12:00:00').toLocaleDateString('es-PE', {
+        weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
+      })}
+      {sesion.producto ? `· ${sesion.producto}` : ''}
     </p>
-  </div>
-
-  <!-- Info de la sesión -->
-  <div class="bg-white border border-gray-200 rounded-xl px-5 py-4 mb-6 flex flex-col gap-1.5">
-    <div class="flex gap-2 text-sm">
-      <span class="text-gray-400 w-24 shrink-0">Producto</span>
-      <span class="text-gray-700">{sesion.producto}</span>
-    </div>
-    <div class="flex gap-2 text-sm">
-      <span class="text-gray-400 w-24 shrink-0">Competencia</span>
-      <span class="text-gray-700">{nombreCompetencia(sesion.competenciaId)}</span>
-    </div>
-    <div class="flex gap-2 text-sm">
-      <span class="text-gray-400 w-24 shrink-0">Capacidad</span>
-      <span class="text-gray-700">{nombreCapacidad(sesion.competenciaId, sesion.capacidadId)}</span>
-    </div>
-    <div class="flex gap-2 text-sm">
-      <span class="text-gray-400 w-24 shrink-0">Criterio</span>
-      <span class="text-gray-700">{sesion.criterio}</span>
-    </div>
   </div>
 
   <EvaluacionForm
     client:load
+    sesion={sesion}
     alumnos={alumnos}
-    evaluacionesIniciales={mapaEvaluaciones}
+    evaluacionesIniciales={evaluaciones}
+    curriculo={curriculo}
     sesionId={Number(sesionId)}
   />
-
 </Layout>

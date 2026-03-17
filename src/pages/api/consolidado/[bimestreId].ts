@@ -3,14 +3,11 @@ import { sql } from '../../../lib/db';
 import type { Nota } from '../../../lib/types';
 
 const PESO: Record<Nota, number> = { AD: 4, A: 3, B: 2, C: 1 };
-const DESDE_PESO: Nota[] = ['C', 'B', 'A', 'AD'];
 
-// Calcula nota final por moda ponderada
 function calcularNotaFinal(notas: Nota[]): Nota {
   if (!notas.length) return 'C';
   const conteo: Record<Nota, number> = { AD: 0, A: 0, B: 0, C: 0 };
   for (const n of notas) conteo[n]++;
-  // La nota más frecuente; en empate, la mayor
   let max = 0;
   let resultado: Nota = 'C';
   for (const nota of ['AD', 'A', 'B', 'C'] as Nota[]) {
@@ -22,7 +19,6 @@ function calcularNotaFinal(notas: Nota[]): Nota {
   return resultado;
 }
 
-// POST → guardar consolidado de una sección
 export const POST: APIRoute = async ({ params, request, locals }) => {
   const docente = locals.docente;
   const { bimestreId } = params;
@@ -37,59 +33,67 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
   const { seccionId }: { seccionId: number } = await request.json();
   if (!seccionId) return Response.json({ error: 'seccionId requerido' }, { status: 422 });
 
-  // Obtener todas las evaluaciones de los alumnos de esta sección en este bimestre
-  const filas = await sql<{ alumnoId: number; sesionId: number; titulo: string; nota: Nota }[]>`
+  // Evaluaciones de los alumnos de esta sección usando sesion_criterio_id
+  const filas = await sql<{
+    alumnoId: number;
+    sesionId: number;
+    titulo: string;
+    sesionCriterioId: number;
+    capacidadId: string;
+    criterio: string;
+    nota: Nota;
+  }[]>`
     SELECT
-      e.alumno_id  AS "alumnoId",
-      e.sesion_id  AS "sesionId",
+      e.alumno_id          AS "alumnoId",
+      sc.sesion_id         AS "sesionId",
       s.titulo,
+      e.sesion_criterio_id AS "sesionCriterioId",
+      sc.capacidad_id      AS "capacidadId",
+      sc.criterio,
       e.nota
     FROM evaluacion e
-    JOIN sesion s ON e.sesion_id = s.id
-    JOIN alumno a ON e.alumno_id = a.id
+    JOIN sesion_criterio sc ON e.sesion_criterio_id = sc.id
+    JOIN sesion s           ON sc.sesion_id = s.id
+    JOIN alumno a           ON e.alumno_id  = a.id
     WHERE s.bimestre_id = ${bimestreId}
       AND a.seccion_id  = ${seccionId}
   `;
 
-  if (!filas.length) {
+  if (!filas.length)
     return Response.json({ error: 'No hay evaluaciones registradas aún.' }, { status: 422 });
-  }
 
   // Agrupar por alumno
-  const porAlumno: Record<number, { sesionId: number; titulo: string; nota: Nota }[]> = {};
+  type EvalRow = typeof filas[number];
+  const porAlumno: Record<number, EvalRow[]> = {};
   for (const f of filas) {
     if (!porAlumno[f.alumnoId]) porAlumno[f.alumnoId] = [];
-    porAlumno[f.alumnoId].push({ sesionId: f.sesionId, titulo: f.titulo, nota: f.nota });
+    porAlumno[f.alumnoId].push(f);
   }
 
-  // Calcular y hacer upsert
   const ahora = new Date().toISOString();
+
   const registros = Object.entries(porAlumno).map(([alumnoId, evals]) => {
-    const notas = evals.map(e => e.nota);
-    const notaFinal = calcularNotaFinal(notas);
+    const notaFinal = calcularNotaFinal(evals.map((e) => e.nota));
     return {
-      alumnoId: Number(alumnoId),
-      notaFinal,
+      alumno_id:  Number(alumnoId),
+      bimestre_id: Number(bimestreId),
+      nota_final: notaFinal,
       detalle: JSON.stringify({
-        sesiones: evals.map(e => ({
-          sesionId: e.sesionId,
-          titulo: e.titulo,
-          nota: e.nota,
+        criterios: evals.map((e) => ({
+          sesionCriterioId: e.sesionCriterioId,
+          sesionTitulo:     e.titulo,
+          capacidadId:      e.capacidadId,
+          criterio:         e.criterio,
+          nota:             e.nota,
         })),
         calculadoEn: ahora,
       }),
     };
   });
 
+  // Upsert usando postgres.js bulk insert nativo
   await sql`
-    INSERT INTO consolidado (alumno_id, bimestre_id, nota_final, detalle)
-    SELECT
-      r.alumno_id::bigint,
-      ${bimestreId}::bigint,
-      r.nota_final::text,
-      r.detalle::jsonb
-    FROM jsonb_to_recordset(${JSON.stringify(registros)}::jsonb)
-      AS r(alumno_id int, nota_final text, detalle jsonb)
+    INSERT INTO consolidado ${sql(registros)}
     ON CONFLICT (alumno_id, bimestre_id)
     DO UPDATE SET
       nota_final = EXCLUDED.nota_final,

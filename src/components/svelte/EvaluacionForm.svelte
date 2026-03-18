@@ -9,41 +9,42 @@
 
     type Celda   = Nota | null;
     type NotaMap = Record<string, Celda>;
+    type ObsMap  = Record<string, string>;
 
     const NOTAS: Nota[] = ["AD", "A", "B", "C"];
 
-    // ── Estado ────────────────────────────────────────────────────────────
     let guardando = false;
     let error     = "";
     let exito     = "";
 
-    function buildMap(evs: Evaluacion[]): NotaMap {
+    function buildNotaMap(evs: Evaluacion[]): NotaMap {
         const m: NotaMap = {};
         for (const ev of evs) m[`${ev.alumnoId}_${ev.sesionCriterioId}`] = ev.nota;
         return m;
     }
+    function buildObsMap(evs: Evaluacion[]): ObsMap {
+        const m: ObsMap = {};
+        for (const ev of evs) if (ev.observacion) m[`${ev.alumnoId}_${ev.sesionCriterioId}`] = ev.observacion;
+        return m;
+    }
 
-    let notas:    NotaMap = buildMap(evaluacionesIniciales);
-    let guardado: NotaMap = buildMap(evaluacionesIniciales);
+    let notas:         NotaMap = buildNotaMap(evaluacionesIniciales);
+    let notasGuardado: NotaMap = buildNotaMap(evaluacionesIniciales);
+    let obs:           ObsMap  = buildObsMap(evaluacionesIniciales);
+    let obsGuardado:   ObsMap  = buildObsMap(evaluacionesIniciales);
+
+    let obsActiva: string | null = null;
 
     $: criterios    = sesion.criterios ?? [];
     $: hayAlumnos   = alumnos.length > 0;
     $: hayCriterios = criterios.length > 0;
 
-    // ── Progreso ──────────────────────────────────────────────────────────
-    $: alumnosCompletos = alumnos.filter((a) =>
-        criterios.every((c) => notas[`${a.id}_${c.id}`] != null),
-    ).length;
-    $: totalCeldas  = alumnos.length * criterios.length;
-    $: celdasLlenas = Object.values(notas).filter(Boolean).length;
-    $: porcentaje   = totalCeldas > 0 ? Math.round((celdasLlenas / totalCeldas) * 100) : 0;
-    $: hayCambios   = JSON.stringify(notas) !== JSON.stringify(guardado);
+    $: celdasConNota = Object.values(notas).filter(Boolean).length;
+    $: totalCeldas   = alumnos.length * criterios.length;
+    $: porcentaje    = totalCeldas > 0 ? Math.round((celdasConNota / totalCeldas) * 100) : 0;
+    $: hayCambios    = JSON.stringify(notas) !== JSON.stringify(notasGuardado)
+                    || JSON.stringify(obs)   !== JSON.stringify(obsGuardado);
 
-    // ── Cabeceras agrupadas ───────────────────────────────────────────────
-    //
-    //  Calculamos "runs" (rachas consecutivas del mismo valor) tanto para
-    //  competencias como para capacidades, para saber el colspan de cada celda.
-    //
     type HeaderGroup = { id: string; nombre: string; colspan: number };
 
     function runs(criterios: SesionCriterio[], keyFn: (c: SesionCriterio) => string, nameFn: (id: string) => string): HeaderGroup[] {
@@ -51,11 +52,8 @@
         for (const c of criterios) {
             const id = keyFn(c);
             const last = groups[groups.length - 1];
-            if (last && last.id === id) {
-                last.colspan++;
-            } else {
-                groups.push({ id, nombre: nameFn(id), colspan: 1 });
-            }
+            if (last && last.id === id) last.colspan++;
+            else groups.push({ id, nombre: nameFn(id), colspan: 1 });
         }
         return groups;
     }
@@ -63,7 +61,6 @@
     function nombreCompetencia(id: string): string {
         return curriculo?.competencias?.find((c: any) => String(c.id) === id)?.nombre ?? id;
     }
-
     function nombreCapacidad(id: string): string {
         for (const comp of curriculo?.competencias ?? []) {
             const cap = comp.capacidades?.find((c: any) => String(c.id) === id);
@@ -75,26 +72,48 @@
     $: gruposCompetencia = runs(criterios, (c) => String(c.competenciaId), nombreCompetencia);
     $: gruposCapacidad   = runs(criterios, (c) => String(c.capacidadId),   nombreCapacidad);
 
-    // ── Mutaciones ────────────────────────────────────────────────────────
     function setNota(alumnoId: number, criterioId: number, nota: Nota) {
         const key  = `${alumnoId}_${criterioId}`;
         notas[key] = notas[key] === nota ? null : nota;
         notas      = { ...notas };
-        error      = "";
-        exito      = "";
+        error = ""; exito = "";
     }
 
-    // ── Guardar ───────────────────────────────────────────────────────────
+    function setObs(key: string, valor: string) {
+        if (valor.trim()) obs[key] = valor;
+        else delete obs[key];
+        obs   = { ...obs };
+        error = ""; exito = "";
+    }
+
+    function toggleObs(key: string) {
+        obsActiva = obsActiva === key ? null : key;
+    }
+
     async function guardar() {
         guardando = true;
-        error     = "";
-        exito     = "";
+        error = ""; exito = "";
 
-        const evaluaciones: { sesionCriterioId: number; alumnoId: number; nota: Nota }[] = [];
+        const evaluaciones: { sesionCriterioId: number; alumnoId: number; nota: Nota | null; observacion?: string }[] = [];
         for (const alumno of alumnos) {
             for (const criterio of criterios) {
-                const nota = notas[`${alumno.id}_${criterio.id}`];
-                if (nota) evaluaciones.push({ sesionCriterioId: criterio.id, alumnoId: alumno.id, nota });
+                const key  = `${alumno.id}_${criterio.id}`;
+                const nota = notas[key] ?? null;
+                if (nota) {
+                    evaluaciones.push({
+                        sesionCriterioId: criterio.id,
+                        alumnoId:         alumno.id,
+                        nota,
+                        ...(obs[key] ? { observacion: obs[key] } : {}),
+                    });
+                } else if (obs[key]) {
+                    evaluaciones.push({
+                        sesionCriterioId: criterio.id,
+                        alumnoId:         alumno.id,
+                        nota:             null,
+                        observacion:      obs[key],
+                    });
+                }
             }
         }
 
@@ -106,8 +125,9 @@
             });
             const json = await res.json();
             if (!res.ok) { error = json.error ?? "Error al guardar."; return; }
-            guardado = { ...notas };
-            exito    = `${json.data.guardados} evaluación${json.data.guardados !== 1 ? "es" : ""} guardada${json.data.guardados !== 1 ? "s" : ""}.`;
+            notasGuardado = { ...notas };
+            obsGuardado   = { ...obs };
+            exito = `${json.data.guardados} evaluación${json.data.guardados !== 1 ? "es" : ""} guardada${json.data.guardados !== 1 ? "s" : ""}.`;
         } catch {
             error = "No se pudo conectar con el servidor.";
         } finally {
@@ -115,7 +135,6 @@
         }
     }
 
-    // ── Colores ───────────────────────────────────────────────────────────
     function notaColor(nota: Nota, sel: boolean): string {
         if (!sel) return "bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600";
         return { AD: "bg-indigo-600 text-white", A: "bg-green-600 text-white", B: "bg-amber-500 text-white", C: "bg-red-600 text-white" }[nota];
@@ -125,15 +144,12 @@
     }
 </script>
 
-<!-- ═══════════════════════════════════════════════════════════════════════
-     CABECERA: progreso + guardar
-════════════════════════════════════════════════════════════════════════ -->
 <div class="flex items-center justify-between gap-4 mb-4 flex-wrap">
     <div class="flex items-center gap-3">
         <div>
             <p class="text-sm font-medium text-gray-800">
-                {alumnosCompletos} / {alumnos.length}
-                <span class="text-gray-400 font-normal">alumnos completos</span>
+                {celdasConNota} / {totalCeldas}
+                <span class="text-gray-400 font-normal">evaluaciones registradas</span>
             </p>
             <div class="mt-1 h-1.5 w-48 bg-gray-100 rounded-full overflow-hidden">
                 <div class="h-full bg-blue-500 rounded-full transition-all duration-300" style="width: {porcentaje}%"></div>
@@ -169,8 +185,7 @@
     <p class="mb-4 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">{exito}</p>
 {/if}
 
-<!-- leyenda -->
-<div class="flex items-center gap-3 mb-4 flex-wrap">
+<div class="flex items-center gap-3 mb-1 flex-wrap">
     <span class="text-xs text-gray-400">Notas:</span>
     {#each NOTAS as nota}
         <span class="flex items-center gap-1 text-xs text-gray-600">
@@ -183,10 +198,11 @@
         </span>
     {/each}
 </div>
+<p class="text-xs text-gray-400 mb-4">
+    Las notas son opcionales. Si un alumno faltó, deja la celda vacía.
+    Usa el ícono <span style="font-size:.8rem;">✏️</span> para agregar observaciones por criterio.
+</p>
 
-<!-- ═══════════════════════════════════════════════════════════════════════
-     CASOS VACÍOS
-════════════════════════════════════════════════════════════════════════ -->
 {#if !hayAlumnos}
     <div class="text-center py-16 text-gray-400">
         <p class="text-sm">No hay alumnos activos en esta sección.</p>
@@ -195,54 +211,39 @@
     <div class="text-center py-16 text-gray-400">
         <p class="text-sm">Esta sesión no tiene criterios de evaluación.</p>
     </div>
-
-<!-- ═══════════════════════════════════════════════════════════════════════
-     TABLA
-════════════════════════════════════════════════════════════════════════ -->
 {:else}
     <div class="overflow-x-auto rounded-xl border border-gray-200">
         <table class="w-full border-collapse text-sm">
             <thead>
-
-                <!-- ── Fila 1: Competencias ── -->
                 <tr class="border-b border-gray-200">
-                    <!-- celda vacía sobre la columna de alumno -->
                     <th
                         rowspan="3"
-                        class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase
-                               tracking-wider sticky left-0 bg-gray-50 z-10 border-r border-gray-200
-                               min-w-40 align-bottom"
+                        class="col-nombre text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase
+                               tracking-wider sticky left-0 bg-gray-50 z-10 border-r border-gray-200 align-bottom"
                     >
                         Alumno
                     </th>
-
                     {#each gruposCompetencia as grupo, i}
                         <th
                             colspan={grupo.colspan}
-                            class="px-3 py-2 text-center text-xs font-semibold text-indigo-700
-                                   bg-indigo-50
+                            class="px-3 py-2 text-center text-xs font-semibold text-indigo-700 bg-indigo-50
                                    {i < gruposCompetencia.length - 1 ? 'border-r border-indigo-200' : ''}"
                         >
                             <span class="line-clamp-2 leading-tight">{grupo.nombre}</span>
                         </th>
                     {/each}
                 </tr>
-
-                <!-- ── Fila 2: Capacidades ── -->
                 <tr class="border-b border-gray-200">
                     {#each gruposCapacidad as grupo, i}
                         <th
                             colspan={grupo.colspan}
-                            class="px-3 py-2 text-center text-[11px] font-medium text-blue-700
-                                   bg-blue-50
+                            class="px-3 py-2 text-center text-[11px] font-medium text-blue-700 bg-blue-50
                                    {i < gruposCapacidad.length - 1 ? 'border-r border-blue-200' : ''}"
                         >
                             <span class="line-clamp-2 leading-tight">{grupo.nombre}</span>
                         </th>
                     {/each}
                 </tr>
-
-                <!-- ── Fila 3: Criterios individuales ── -->
                 <tr class="bg-gray-50 border-b border-gray-200">
                     {#each criterios as criterio, idx}
                         <th
@@ -263,33 +264,33 @@
                         </th>
                     {/each}
                 </tr>
-
             </thead>
 
-            <!-- ── Cuerpo ── -->
             <tbody class="divide-y divide-gray-100">
                 {#each alumnos as alumno}
-                    {@const completo = criterios.every((c) => notas[`${alumno.id}_${c.id}`] != null)}
+                    {@const tieneAlgunaNota = criterios.some((c) => notas[`${alumno.id}_${c.id}`] != null)}
 
-                    <tr class="hover:bg-gray-50/60 transition-colors group {completo ? 'bg-green-50/30' : ''}">
-
-                        <!-- Nombre sticky -->
-                        <td class="col-nombre px-2 py-2.5 sticky left-0 z-10 border-r border-gray-200 transition-colors
-                                   {completo ? 'bg-green-50/60 group-hover:bg-green-50' : 'bg-white group-hover:bg-gray-50/60'}">
+                    <tr class="transition-colors group {tieneAlgunaNota ? '' : 'opacity-80'}">
+                        <td class="col-nombre px-2 py-2.5 sticky left-0 z-10 border-r border-gray-200 bg-white
+                                   group-hover:bg-gray-50/60 transition-colors">
                             <div class="flex items-center gap-1.5">
-                                <span class="shrink-0 w-1.5 h-1.5 rounded-full {completo ? 'bg-green-500' : 'bg-gray-200'}"></span>
+                                <span class="shrink-0 w-1.5 h-1.5 rounded-full {tieneAlgunaNota ? 'bg-blue-400' : 'bg-gray-200'}"></span>
                                 <span class="nombre-alumno text-sm text-gray-900 font-medium">
                                     {alumno.apellido}, {alumno.nombre}
                                 </span>
                             </div>
                         </td>
 
-                        <!-- Celdas de nota -->
                         {#each criterios as criterio, critIdx}
-                            {@const notaActual = notas[`${alumno.id}_${criterio.id}`] ?? null}
-                            <td class="px-2 py-2 text-center
+                            {@const key        = `${alumno.id}_${criterio.id}`}
+                            {@const notaActual = notas[key] ?? null}
+                            {@const obsAbierta = obsActiva === key}
+                            {@const tieneObs   = !!obs[key]}
+
+                            <td class="px-2 py-1.5 text-center align-top
                                        {critIdx < criterios.length - 1 ? 'border-r border-gray-100' : ''}">
-                                <div class="flex items-center justify-center gap-0.5">
+
+                                <div class="flex items-center justify-center gap-0.5 mb-1">
                                     {#each NOTAS as nota}
                                         <button
                                             type="button"
@@ -301,7 +302,37 @@
                                             {nota}
                                         </button>
                                     {/each}
+
+                                    <button
+                                        type="button"
+                                        on:click={() => toggleObs(key)}
+                                        title="Observación"
+                                        class="btn-obs {obsAbierta ? 'btn-obs--activo' : ''} {tieneObs ? 'btn-obs--con-datos' : ''}"
+                                    >
+                                        <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
+                                            <path d="M2 2h10v8H8l-2 2-1-2H2V2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+                                            <path d="M4 5h6M4 7.5h4" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>
+                                        </svg>
+                                    </button>
                                 </div>
+
+                                {#if !notaActual}
+                                    <span class="text-[9px] text-gray-300 leading-none">sin nota</span>
+                                {/if}
+
+                                {#if obsAbierta}
+                                    <div class="obs-box mt-1">
+                                        <textarea
+                                            value={obs[key] ?? ""}
+                                            on:input={(e) => setObs(key, e.currentTarget.value)}
+                                            placeholder="Observación..."
+                                            rows="2"
+                                            class="obs-textarea"
+                                        ></textarea>
+                                    </div>
+                                {:else if tieneObs}
+                                    <p class="obs-preview">{obs[key]}</p>
+                                {/if}
                             </td>
                         {/each}
                     </tr>
@@ -325,8 +356,8 @@
         </div>
     {/if}
 {/if}
+
 <style>
-  /* ── Columna de nombres responsive ── */
   .col-nombre {
     width: 150px;
     min-width: 150px;
@@ -335,11 +366,7 @@
   .nombre-alumno { display: inline; }
 
   @media (max-width: 640px) {
-    .col-nombre {
-      width: 82px;
-      min-width: 82px;
-      max-width: 82px;
-    }
+    .col-nombre { width: 82px; min-width: 82px; max-width: 82px; }
     .nombre-alumno {
       font-size: .60rem;
       line-height: 1.25;
@@ -349,7 +376,36 @@
     }
   }
 
-  /* ── Institutional Blue Design System ── */
+  .btn-obs {
+    width: 22px; height: 28px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 4px; border: none; background: transparent;
+    color: #C8D3E8; cursor: pointer;
+    transition: background .15s, color .15s;
+    flex-shrink: 0;
+  }
+  .btn-obs:hover            { background: #EEF2F9; color: #1B3A6B; }
+  .btn-obs--activo          { background: #EEF2F9; color: #1B3A6B; }
+  .btn-obs--con-datos       { color: #C8882A; }
+  .btn-obs--con-datos:hover { background: #FEF3E2; color: #A06820; }
+
+  .obs-box { width: 100%; }
+  .obs-textarea {
+    width: 100%; min-width: 130px;
+    font-size: .72rem; line-height: 1.4;
+    border: 1px solid #DDE3EE; border-radius: 6px;
+    padding: 4px 6px; resize: vertical; outline: none;
+    color: #1A2332; background: #FAFAFA;
+    transition: border-color .15s;
+  }
+  .obs-textarea:focus { border-color: rgba(27,58,107,.35); background: #fff; }
+  .obs-preview {
+    font-size: .68rem; color: #C8882A;
+    line-height: 1.3; margin-top: 2px;
+    text-align: left; white-space: pre-wrap;
+    word-break: break-word; max-height: 40px; overflow: hidden;
+  }
+
   :global(.bg-blue-600)                   { background-color: #1B3A6B !important; }
   :global(.bg-blue-500)                   { background-color: #2A5298 !important; }
   :global(.bg-blue-50)                    { background-color: #EEF2F9 !important; }
@@ -374,9 +430,7 @@
   :global(.focus\:ring-blue-500)         { --tw-ring-color: rgba(27,58,107,.4) !important; }
   :global(.focus\:ring-blue-400)         { --tw-ring-color: rgba(27,58,107,.35) !important; }
   :global(.divide-blue-100 > * + *)      { border-color: rgba(27,58,107,.1) !important; }
-  /* Progress bar */
   :global(.bg-blue-500.rounded-full)     { background-color: #1B3A6B !important; }
-  /* "Evaluar" link */
   :global(.text-blue-600.border.border-blue-200) {
     color: #1B3A6B !important;
     border-color: rgba(27,58,107,.22) !important;

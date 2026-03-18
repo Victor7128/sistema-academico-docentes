@@ -67,12 +67,14 @@ const evaluaciones = await query<{
   sesionId: number;
   alumnoId: number;
   nota: string;
+  observacion: string | null;
 }>`
   SELECT
     e.sesion_criterio_id AS "sesionCriterioId",
     sc.sesion_id         AS "sesionId",
     e.alumno_id          AS "alumnoId",
-    e.nota
+    e.nota,
+    e.observacion
   FROM evaluacion e
   JOIN sesion_criterio sc ON e.sesion_criterio_id = sc.id
   JOIN sesion s           ON sc.sesion_id = s.id
@@ -98,28 +100,24 @@ const curriculo = cursoDocente ? getCurriculoPorNombre(cursoDocente.nombre) : nu
 ---
 
 <Layout title={`Consolidado — Sección ${seccion.nombre}`}>
-  <style>
-    .ph { font-family: 'DM Serif Display', serif; font-size: clamp(1.35rem, 3vw, 1.7rem); color: #1A2332; line-height: 1.15; }
-    .pm { font-size: .78rem; color: #8A96AA; margin-top: .2rem; }
-    .pbc { display: flex; align-items: center; gap: .3rem; font-size: .72rem; flex-wrap: wrap; margin-bottom: .6rem; }
-    .pbc a { color: #8A96AA; text-decoration: none; transition: color .15s; }
-    .pbc a:hover { color: #1B3A6B; }
-    .pbc-sep { color: #C8D3E8; }
-    .pbc-cur { color: #4A5672; font-weight: 500; }
-  </style>
-
-  <div style="margin-bottom:1.5rem;">
-    <nav class="pbc">
-      <a href={`/app/${bimestreId}`}>{bimestre.nombre} {bimestre.anio}</a>
-      <span class="pbc-sep">›</span>
-      <a href={`/app/${bimestreId}/${gradoId}`}>{grado.nombre}</a>
-      <span class="pbc-sep">›</span>
-      <a href={`/app/${bimestreId}/${gradoId}/${seccionId}`}>Sección {seccion.nombre}</a>
-      <span class="pbc-sep">›</span>
-      <span class="pbc-cur">Consolidado</span>
+  <div class="mb-6">
+    <nav class="flex items-center gap-1.5 text-xs text-gray-400 mb-3 flex-wrap">
+      <a href={`/app/${bimestreId}`} class="hover:text-gray-600 transition-colors">
+        {bimestre.nombre} {bimestre.anio}
+      </a>
+      <span>›</span>
+      <a href={`/app/${bimestreId}/${gradoId}`} class="hover:text-gray-600 transition-colors">
+        {grado.nombre}
+      </a>
+      <span>›</span>
+      <span class="text-gray-600">Sección {seccion.nombre} — Consolidado</span>
     </nav>
-    <h1 class="ph">Consolidado <span style="font-style:italic;color:#C8882A;">· Sección {seccion.nombre}</span></h1>
-    <p class="pm">{grado.nombre} · {bimestre.nombre} {bimestre.anio}</p>
+    <h1 class="text-xl font-semibold text-gray-900">
+      Consolidado · Sección {seccion.nombre}
+    </h1>
+    <p class="text-sm text-gray-400 mt-0.5">
+      {grado.nombre} · {bimestre.nombre} · {bimestre.anio}
+    </p>
   </div>
 
   <ConsolidadoForm

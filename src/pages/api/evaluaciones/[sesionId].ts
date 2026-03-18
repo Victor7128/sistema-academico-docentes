@@ -52,10 +52,11 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
   if (!Array.isArray(evaluaciones))
     return Response.json({ error: 'Formato inválido' }, { status: 422 });
 
+  // null = alumno ausente/pendiente → válido. Solo rechazar valores inválidos no nulos.
   for (const ev of evaluaciones) {
-    if (!NOTAS_VALIDAS.includes(ev.nota))
+    if (ev.nota !== null && !NOTAS_VALIDAS.includes(ev.nota))
       return Response.json(
-        { error: `Nota inválida: "${ev.nota}". Debe ser AD, A, B o C.` },
+        { error: `Nota inválida: "${ev.nota}". Debe ser AD, A, B, C o null.` },
         { status: 422 },
       );
   }
@@ -64,7 +65,6 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
   const criteriosValidos = await sql<{ id: number }[]>`
     SELECT id FROM sesion_criterio WHERE sesion_id = ${sesionId}
   `;
-  // Normalizar a string para evitar mismatch number vs bigint string
   const idsValidos = new Set(criteriosValidos.map((c) => String(c.id)));
 
   for (const ev of evaluaciones) {
@@ -84,16 +84,19 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
   `;
 
   // Insertar las nuevas (si las hay)
-  if (evaluaciones.length > 0) {
-    const filas = evaluaciones.map((ev) => ({
+  // Solo insertamos filas que tengan nota O observación — omitir filas completamente vacías
+  const filas = evaluaciones
+    .filter((ev) => ev.nota !== null || ev.observacion)
+    .map((ev) => ({
       sesion_criterio_id: ev.sesionCriterioId,
       alumno_id:          ev.alumnoId,
-      nota:               ev.nota,
+      nota:               ev.nota ?? null,
       observacion:        ev.observacion ?? null,
     }));
 
+  if (filas.length > 0) {
     await sql`INSERT INTO evaluacion ${sql(filas)}`;
   }
 
-  return Response.json({ data: { guardados: evaluaciones.length } });
+  return Response.json({ data: { guardados: filas.length } });
 };

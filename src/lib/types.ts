@@ -123,7 +123,7 @@ export interface EvaluacionLoteBody {
   evaluaciones: {
     sesionCriterioId: number;
     alumnoId: number;
-    nota: Nota;
+    nota: Nota | null;  // null si el alumno faltó
     observacion?: string;
   }[];
 }
@@ -134,7 +134,7 @@ export interface Evaluacion {
   id: number;
   sesionCriterioId: number;
   alumnoId: number;
-  nota: Nota;
+  nota: Nota | null;   // null = alumno ausente o pendiente
   observacion: string | null;
   createdAt: string;
   updatedAt: string;
@@ -144,7 +144,7 @@ export interface Consolidado {
   id: number;
   alumnoId: number;
   bimestreId: number;
-  notaFinal: Nota;
+  notaFinal: Nota | null;  // null = docente aún no la ingresa
   detalle: ConsolidadoDetalle | null;
   createdAt: string;
   updatedAt: string;

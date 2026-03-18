@@ -2,57 +2,50 @@
 import Layout from '../../../../../layouts/Layout.astro';
 import NavCard from '../../../../../components/astro/NavCard.astro';
 import { query } from '../../../../../lib/db';
-import type { Bimestre, Grado, Seccion } from '../../../../../lib/types';
 
 const docente = Astro.locals.docente;
 const { bimestreId, gradoId, seccionId } = Astro.params;
 if (!bimestreId || !gradoId || !seccionId) return Astro.redirect('/');
 
-const [bimestre] = await query<Bimestre>`
-  SELECT id, nombre, anio
-  FROM bimestre
-  WHERE id = ${bimestreId}
-    AND docente_id = ${docente.id}
-`;
+// ── 4 queries → 2: acceso + counts en paralelo ───────────────────────────
+const [accesoResult, countsResult] = await Promise.all([
+  query<{ bNombre: string; bAnio: number; gNombre: string; sNombre: string }>`
+    SELECT
+      b.nombre  AS "bNombre",
+      b.anio    AS "bAnio",
+      g.nombre  AS "gNombre",
+      s.nombre  AS "sNombre"
+    FROM bimestre b
+    JOIN docente_grado dg ON dg.docente_id = ${docente.id}
+    JOIN grado g  ON g.id  = dg.grado_id
+    JOIN seccion s ON s.grado_id = g.id
+    WHERE b.id         = ${bimestreId}
+      AND b.docente_id = ${docente.id}
+      AND g.id         = ${gradoId}
+      AND g.estado     = 1
+      AND s.id         = ${seccionId}
+      AND s.estado     = 1
+  `,
+  query<{ alumnos: number; sesiones: number; consolidados: number }>`
+    SELECT
+      (SELECT COUNT(*) FROM alumno
+       WHERE seccion_id = ${seccionId} AND estado = 1)          AS alumnos,
+      (SELECT COUNT(*) FROM sesion
+       WHERE bimestre_id = ${bimestreId}
+         AND grado_id = ${gradoId} AND estado = 1)              AS sesiones,
+      (SELECT COUNT(*) FROM consolidado co
+       JOIN alumno a ON co.alumno_id = a.id
+       WHERE a.seccion_id = ${seccionId}
+         AND co.bimestre_id = ${bimestreId})                    AS consolidados
+  `,
+]);
 
-if (!bimestre) return Astro.redirect('/');
-
-const [grado] = await query<Grado>`
-  SELECT g.id, g.nombre
-  FROM grado g
-  JOIN docente_grado dg ON dg.grado_id = g.id
-  WHERE g.id = ${gradoId}
-    AND dg.docente_id = ${docente.id}
-    AND g.estado = 1
-`;
-
-if (!grado) return Astro.redirect(`/app/${bimestreId}`);
-
-const [seccion] = await query<Seccion>`
-  SELECT id, nombre
-  FROM seccion
-  WHERE id = ${seccionId}
-    AND grado_id = ${gradoId}
-    AND estado = 1
-`;
-
-if (!seccion) return Astro.redirect(`/app/${bimestreId}/${gradoId}`);
-
-const [counts] = await query<{ alumnos: number; sesiones: number; consolidados: number }>`
-  SELECT
-    (SELECT COUNT(*) FROM alumno
-     WHERE seccion_id = ${seccionId} AND estado = 1)     AS alumnos,
-    (SELECT COUNT(*) FROM sesion
-     WHERE bimestre_id = ${bimestreId}
-       AND grado_id = ${gradoId} AND estado = 1)         AS sesiones,
-    (SELECT COUNT(*) FROM consolidado co
-     JOIN alumno a ON co.alumno_id = a.id
-     WHERE a.seccion_id = ${seccionId}
-       AND co.bimestre_id = ${bimestreId})               AS consolidados
-`;
+const [acceso] = accesoResult;
+if (!acceso) return Astro.redirect('/');
+const [counts] = countsResult;
 ---
 
-<Layout title={`Sección ${seccion.nombre} — ${grado.nombre}`}>
+<Layout title={`Sección ${acceso.sNombre} — ${acceso.gNombre}`}>
   <style>
     .ph { font-family: 'DM Serif Display', serif; font-size: clamp(1.35rem, 3vw, 1.7rem); color: #1A2332; line-height: 1.15; }
     .pm { font-size: .78rem; color: #8A96AA; margin-top: .2rem; }
@@ -65,14 +58,14 @@ const [counts] = await query<{ alumnos: number; sesiones: number; consolidados: 
 
   <div style="margin-bottom:1.75rem;">
     <nav class="pbc">
-      <a href={`/app/${bimestreId}`}>{bimestre.nombre} {bimestre.anio}</a>
+      <a href={`/app/${bimestreId}`}>{acceso.bNombre} {acceso.bAnio}</a>
       <span class="pbc-sep">›</span>
-      <a href={`/app/${bimestreId}/${gradoId}`}>{grado.nombre}</a>
+      <a href={`/app/${bimestreId}/${gradoId}`}>{acceso.gNombre}</a>
       <span class="pbc-sep">›</span>
-      <span class="pbc-cur">Sección {seccion.nombre}</span>
+      <span class="pbc-cur">Sección {acceso.sNombre}</span>
     </nav>
-    <h1 class="ph">Sección <span style="font-style:italic;color:#C8882A;">{seccion.nombre}</span></h1>
-    <p class="pm">{grado.nombre} · {bimestre.nombre} {bimestre.anio}</p>
+    <h1 class="ph">Sección <span style="font-style:italic;color:#C8882A;">{acceso.sNombre}</span></h1>
+    <p class="pm">{acceso.gNombre} · {acceso.bNombre} {acceso.bAnio}</p>
   </div>
 
   <div class="flex flex-col gap-2">

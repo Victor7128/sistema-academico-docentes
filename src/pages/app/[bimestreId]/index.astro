@@ -8,23 +8,24 @@ const docente = Astro.locals.docente;
 const { bimestreId } = Astro.params;
 if (!bimestreId) return Astro.redirect('/');
 
-const [bimestre] = await query<Bimestre>`
-  SELECT id, nombre, orden, anio, estado
-  FROM bimestre
-  WHERE id = ${bimestreId}
-    AND docente_id = ${docente.id}
-`;
+// ── 2 queries → 1: bimestre + grados en paralelo ─────────────────────────
+const [bimestreResult, grados] = await Promise.all([
+  query<Bimestre>`
+    SELECT id, nombre, orden, anio, estado
+    FROM bimestre
+    WHERE id = ${bimestreId} AND docente_id = ${docente.id}
+  `,
+  query<Grado>`
+    SELECT g.id, g.nombre
+    FROM grado g
+    JOIN docente_grado dg ON dg.grado_id = g.id
+    WHERE dg.docente_id = ${docente.id} AND g.estado = 1
+    ORDER BY g.nombre
+  `,
+]);
 
+const [bimestre] = bimestreResult;
 if (!bimestre) return Astro.redirect('/');
-
-const grados = await query<Grado>`
-  SELECT g.id, g.nombre
-  FROM grado g
-  JOIN docente_grado dg ON dg.grado_id = g.id
-  WHERE dg.docente_id = ${docente.id}
-    AND g.estado = 1
-  ORDER BY g.nombre
-`;
 ---
 
 <Layout title={bimestre.nombre}>

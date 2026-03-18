@@ -33,9 +33,11 @@ export const onRequest = defineMiddleware(async (context, next) => {
   // 3. Buscar docente en la BD por google_sub
   const [docente] = await sql<Docente[]>`
     SELECT d.id, d.nombre, d.email, d.curso_id,
-           d.onboarding_completado, d.estado
+           d.onboarding_completado, d.estado,
+           c.nombre AS "cursoNombre"
     FROM auth_google ag
     JOIN docente d ON ag.docente_id = d.id
+    LEFT JOIN curso c ON c.id = d.curso_id
     WHERE ag.google_sub = ${session.user.id}
       AND d.estado = 1
   `;

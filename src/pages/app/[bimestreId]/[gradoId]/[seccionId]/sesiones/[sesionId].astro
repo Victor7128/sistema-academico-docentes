@@ -3,97 +3,89 @@ import Layout from '../../../../../../layouts/Layout.astro';
 import EvaluacionForm from '../../../../../../components/svelte/EvaluacionForm.svelte';
 import { query } from '../../../../../../lib/db';
 import { getCurriculoPorNombre } from '../../../../../../lib/curriculo/index';
-import type {
-  Bimestre,
-  Grado,
-  Seccion,
-  Sesion,
-  SesionCriterio,
-  Alumno,
-  Evaluacion,
-} from '../../../../../../lib/types';
+import type { Sesion, SesionCriterio, Alumno, Evaluacion } from '../../../../../../lib/types';
 
 const docente = Astro.locals.docente;
 const { bimestreId, gradoId, seccionId, sesionId } = Astro.params;
 if (!bimestreId || !gradoId || !seccionId || !sesionId) return Astro.redirect('/');
 
-// ── Verificar acceso ──────────────────────────────────────────────────────
+// ── 7 queries → 3: acceso en 1 JOIN, luego 2 en paralelo ─────────────────
 
-const [bimestre] = await query<Bimestre>`
-  SELECT id, nombre, anio FROM bimestre
-  WHERE id = ${bimestreId} AND docente_id = ${docente.id}
-`;
-if (!bimestre) return Astro.redirect('/');
-
-const [grado] = await query<Grado>`
-  SELECT g.id, g.nombre FROM grado g
-  JOIN docente_grado dg ON dg.grado_id = g.id
-  WHERE g.id = ${gradoId} AND dg.docente_id = ${docente.id} AND g.estado = 1
-`;
-if (!grado) return Astro.redirect(`/app/${bimestreId}`);
-
-const [seccion] = await query<Seccion>`
-  SELECT id, nombre FROM seccion
-  WHERE id = ${seccionId} AND grado_id = ${gradoId} AND estado = 1
-`;
-if (!seccion) return Astro.redirect(`/app/${bimestreId}/${gradoId}`);
-
-// ── Sesión con sus criterios ──────────────────────────────────────────────
-
-const [sesion] = await query<Sesion & { criterios: SesionCriterio[] }>`
+// 1. Verificar acceso completo + obtener nombres en un solo JOIN
+const [acceso] = await query<{
+  bNombre: string; bAnio: number;
+  gNombre: string;
+  sNombre: string;
+}>`
   SELECT
-    s.id, s.titulo, s.producto, s.fecha, s.estado,
-    COALESCE(
-      json_agg(
-        json_build_object(
-          'id',            sc.id,
-          'competenciaId', sc.competencia_id,
-          'capacidadId',   sc.capacidad_id,
-          'criterio',      sc.criterio,
-          'orden',         sc.orden
-        ) ORDER BY sc.orden
-      ) FILTER (WHERE sc.id IS NOT NULL),
-      '[]'
-    ) AS criterios
-  FROM sesion s
-  LEFT JOIN sesion_criterio sc ON sc.sesion_id = s.id
-  WHERE s.id = ${sesionId}
-    AND s.bimestre_id = ${bimestreId}
-    AND s.grado_id    = ${gradoId}
-  GROUP BY s.id
+    b.nombre  AS "bNombre",
+    b.anio    AS "bAnio",
+    g.nombre  AS "gNombre",
+    s.nombre  AS "sNombre"
+  FROM bimestre b
+  JOIN docente_grado dg ON dg.docente_id = ${docente.id}
+  JOIN grado g   ON g.id   = dg.grado_id
+  JOIN seccion s ON s.grado_id = g.id
+  WHERE b.id         = ${bimestreId}
+    AND b.docente_id = ${docente.id}
+    AND g.id         = ${gradoId}
+    AND g.estado     = 1
+    AND s.id         = ${seccionId}
+    AND s.estado     = 1
 `;
+if (!acceso) return Astro.redirect('/');
+
+// 2. Sesión + alumnos + evaluaciones + curso: todo en paralelo
+const [sesionResult, alumnos, evaluaciones] = await Promise.all([
+  query<Sesion & { criterios: SesionCriterio[] }>`
+    SELECT
+      s.id, s.titulo, s.producto, s.fecha, s.estado,
+      COALESCE(
+        json_agg(
+          json_build_object(
+            'id',            sc.id,
+            'competenciaId', sc.competencia_id,
+            'capacidadId',   sc.capacidad_id,
+            'criterio',      sc.criterio,
+            'orden',         sc.orden
+          ) ORDER BY sc.orden
+        ) FILTER (WHERE sc.id IS NOT NULL),
+        '[]'
+      ) AS criterios
+    FROM sesion s
+    LEFT JOIN sesion_criterio sc ON sc.sesion_id = s.id
+    WHERE s.id          = ${sesionId}
+      AND s.bimestre_id = ${bimestreId}
+      AND s.grado_id    = ${gradoId}
+    GROUP BY s.id
+  `,
+  query<Alumno>`
+    SELECT id, nombre, apellido, orden
+    FROM alumno
+    WHERE seccion_id = ${seccionId} AND estado = 1
+    ORDER BY orden ASC, apellido ASC, nombre ASC
+  `,
+  query<Evaluacion>`
+    SELECT
+      e.id,
+      e.sesion_criterio_id AS "sesionCriterioId",
+      e.alumno_id          AS "alumnoId",
+      e.nota,
+      e.observacion
+    FROM evaluacion e
+    JOIN sesion_criterio sc ON e.sesion_criterio_id = sc.id
+    WHERE sc.sesion_id = ${sesionId}
+  `,
+]);
+
+const [sesion] = sesionResult;
 if (!sesion || sesion.estado === 0)
   return Astro.redirect(`/app/${bimestreId}/${gradoId}/${seccionId}/sesiones`);
 
-// ── Alumnos de la sección ─────────────────────────────────────────────────
-
-const alumnos = await query<Alumno>`
-  SELECT id, nombre, apellido, orden
-  FROM alumno
-  WHERE seccion_id = ${seccionId} AND estado = 1
-  ORDER BY orden ASC, apellido ASC, nombre ASC
-`;
-
-// ── Evaluaciones existentes ───────────────────────────────────────────────
-
-const evaluaciones = await query<Evaluacion>`
-  SELECT
-    e.id,
-    e.sesion_criterio_id AS "sesionCriterioId",
-    e.alumno_id          AS "alumnoId",
-    e.nota,
-    e.observacion
-  FROM evaluacion e
-  JOIN sesion_criterio sc ON e.sesion_criterio_id = sc.id
-  WHERE sc.sesion_id = ${sesionId}
-`;
-
-// ── Currículo ─────────────────────────────────────────────────────────────
-
-const [cursoDocente] = await query<{ nombre: string }>`
-  SELECT nombre FROM curso WHERE id = ${docente.cursoId}
-`;
-const curriculo = cursoDocente ? getCurriculoPorNombre(cursoDocente.nombre) : null;
+// Currículo: local, sin query adicional
+const curriculo = getCurriculoPorNombre(
+  docente.cursoNombre ?? ''
+) ?? null;
 ---
 
 <Layout title={`Evaluación — ${sesion.titulo}`}>
@@ -109,11 +101,11 @@ const curriculo = cursoDocente ? getCurriculoPorNombre(cursoDocente.nombre) : nu
 
   <div style="margin-bottom:1.5rem;">
     <nav class="pbc">
-      <a href={`/app/${bimestreId}`}>{bimestre.nombre} {bimestre.anio}</a>
+      <a href={`/app/${bimestreId}`}>{acceso.bNombre} {acceso.bAnio}</a>
       <span class="pbc-sep">›</span>
-      <a href={`/app/${bimestreId}/${gradoId}`}>{grado.nombre}</a>
+      <a href={`/app/${bimestreId}/${gradoId}`}>{acceso.gNombre}</a>
       <span class="pbc-sep">›</span>
-      <a href={`/app/${bimestreId}/${gradoId}/${seccionId}/sesiones`}>Sección {seccion.nombre}</a>
+      <a href={`/app/${bimestreId}/${gradoId}/${seccionId}/sesiones`}>Sección {acceso.sNombre}</a>
       <span class="pbc-sep">›</span>
       <span class="pbc-cur">Evaluación</span>
     </nav>

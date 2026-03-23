@@ -1,6 +1,16 @@
 import type { APIRoute } from 'astro';
 import { sql } from '../../../../lib/db';
 
+function limpiarPrefijo(linea: string): string {
+  let l = linea.trim();
+  l = l.replace(/^[\s\u00A0]*[-–—•·*Ø\u2022\u00B7\u25CF\u25E6\u2013\u2014][\s\u00A0]*/u, '');
+  l = l.replace(/^[\s\u00A0]*([a-zA-Z0-9]{1,3}[.)]\s*)+/u, '');
+  l = l.replace(/^\d+\s+/, '');
+  l = l.replace(/[\s\u00A0—–-]+$/, '');
+  l = l.replace(/\s{2,}/g, ' ').trim();
+  return l;
+}
+
 export const POST: APIRoute = async ({ params, request, locals }) => {
   const docente = locals.docente;
   const { seccionId } = params;
@@ -17,25 +27,29 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
   const { lineas }: { lineas: string[] } = await request.json();
   if (!lineas?.length) return Response.json({ error: 'Sin datos' }, { status: 422 });
 
-  // Parsear cada línea del .txt
-  // Formatos soportados:
-  //   "APELLIDOS, NOMBRE"   → divide por coma
-  //   "APELLIDO NOMBRE"     → última palabra es nombre, resto apellido
+  const CABECERA = /^[#№]?\s*(apellidos?|nombres?|código|codigo|n[°º])/i;
+
   const alumnos = lineas
-    .map(l => l.trim())
+    .map(l => limpiarPrefijo(l))
     .filter(Boolean)
+    .filter(l => !CABECERA.test(l))
     .map((linea, i) => {
       let nombre = '';
       let apellido = '';
 
       if (linea.includes(',')) {
-        const [ap, no] = linea.split(',').map(s => s.trim());
+        const [ap, no] = linea.split(',').map(s => s.trim().toUpperCase());
         apellido = ap ?? '';
-        nombre   = no ?? '';
+        nombre = no ?? '';
       } else {
-        const partes = linea.split(/\s+/);
-        nombre   = partes.pop() ?? '';
-        apellido = partes.join(' ');
+        const partes = linea.toUpperCase().split(/\s+/);
+        if (partes.length === 2) {
+          apellido = partes[0];
+          nombre = partes[1];
+        } else {
+          apellido = partes.slice(0, 2).join(' ');
+          nombre = partes.slice(2).join(' ');
+        }
       }
 
       return { nombre, apellido, orden: i + 1 };
@@ -46,13 +60,11 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
     return Response.json({ error: 'No se pudo parsear ningún alumno' }, { status: 422 });
   }
 
-  // Obtener el orden máximo actual
   const [{ maxOrden }] = await sql<{ maxOrden: number }[]>`
     SELECT COALESCE(MAX(orden), 0) AS "maxOrden"
     FROM alumno WHERE seccion_id = ${seccionId}
   `;
 
-  // Insertar en lote
   const valores = alumnos.map((a, i) => ({
     seccion_id: Number(seccionId),
     orden: maxOrden + i + 1,
@@ -60,10 +72,26 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
     apellido: a.apellido,
   }));
 
-  await sql`
-    INSERT INTO alumno ${sql(valores, 'seccion_id', 'orden', 'nombre', 'apellido')}
-    ON CONFLICT DO NOTHING
-  `;
+  const existentes = await sql<{ nombre: string; apellido: string }[]>`
+  SELECT nombre, apellido FROM alumno 
+  WHERE seccion_id = ${seccionId} AND estado = 1
+`;
 
-  return Response.json({ data: { importados: valores.length } }, { status: 201 });
+  const existentesSet = new Set(
+    existentes.map(a => `${a.apellido.toUpperCase()}|${a.nombre.toUpperCase()}`)
+  );
+
+  const nuevos = valores.filter(
+    v => !existentesSet.has(`${v.apellido}|${v.nombre}`)
+  );
+
+  if (!nuevos.length) {
+    return Response.json({ error: 'Todos los alumnos ya están registrados.' }, { status: 422 });
+  }
+
+  await sql`
+  INSERT INTO alumno ${sql(nuevos, 'seccion_id', 'orden', 'nombre', 'apellido')}
+`;
+
+  return Response.json({ data: { importados: nuevos.length } }, { status: 201 });
 };

@@ -1,11 +1,3 @@
-// src/pages/api/alumnos/copiar/[seccionId].ts
-//
-// POST /api/alumnos/copiar/:seccionId
-// Body: { origenSeccionId: number }
-//
-// Copia los alumnos activos de origenSeccionId a seccionId,
-// omitiendo los que ya existen (por apellido+nombre exactos).
-
 import type { APIRoute } from 'astro';
 import { query, sql } from '../../../../lib/db';
 import type { Alumno } from '../../../../lib/types';
@@ -68,9 +60,9 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
 
   // Traer alumnos ya existentes en destino (para evitar duplicados)
   const alumnosExistentes = await query<{ nombre: string; apellido: string }>`
-    SELECT nombre, apellido FROM alumno
-    WHERE seccion_id = ${seccionId}
-  `;
+  SELECT nombre, apellido FROM alumno
+  WHERE seccion_id = ${seccionId} AND estado = 1
+`;
 
   const existentesSet = new Set(
     alumnosExistentes.map(a => `${a.apellido.toLowerCase()}|${a.nombre.toLowerCase()}`)

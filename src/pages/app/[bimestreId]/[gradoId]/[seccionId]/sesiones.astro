@@ -51,10 +51,7 @@ const sesiones = await query<Sesion & { criterios: SesionCriterio[] }>`
   ORDER BY s.fecha ASC
 `;
 
-const [cursoDocente] = await query<{ nombre: string }>`
-  SELECT nombre FROM curso WHERE id = ${docente.cursoId}
-`;
-const curriculo = cursoDocente ? getCurriculoPorNombre(cursoDocente.nombre) : null;
+const curriculo = docente.cursoNombre ? getCurriculoPorNombre(docente.cursoNombre) : null;
 ---
 
 <Layout title={`Sesiones — Sección ${seccion.nombre}`}>

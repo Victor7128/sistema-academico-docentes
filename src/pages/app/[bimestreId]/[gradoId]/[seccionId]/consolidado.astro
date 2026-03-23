@@ -93,10 +93,7 @@ const consolidados = await query<{ alumnoId: number; notaFinal: string }>`
     AND a.seccion_id   = ${seccionId}
 `;
 
-const [cursoDocente] = await query<{ nombre: string }>`
-  SELECT nombre FROM curso WHERE id = ${docente.cursoId}
-`;
-const curriculo = cursoDocente ? getCurriculoPorNombre(cursoDocente.nombre) : null;
+const curriculo = docente.cursoNombre ? getCurriculoPorNombre(docente.cursoNombre) : null;
 ---
 
 <Layout title={`Consolidado — Sección ${seccion.nombre}`}>

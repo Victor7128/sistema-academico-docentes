@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Alumno } from '../../lib/types';
+  import type { Alumno } from "../../lib/types";
 
   export let alumnos: Alumno[] = [];
   export let seccionId: number;
@@ -12,15 +12,15 @@
   // Estado local — copia mutable de la lista
   let lista: Alumno[] = [...alumnos];
   let cargando = false;
-  let error = '';
-  let exito = '';
+  let error = "";
+  let exito = "";
 
   // Modal de edición / creación
   let modalAbierto = false;
   let editando: Alumno | null = null;
-  let formNombre = '';
-  let formApellido = '';
-  let formCodigo = '';
+  let formNombre = "";
+  let formApellido = "";
+  let formCodigo = "";
 
   // Modal copiar alumnos de otro bimestre
   let modalCopiarAbierto = false;
@@ -28,43 +28,43 @@
   let copiando = false;
 
   function abrirCopiar() {
-    origenSeleccionado = seccionesOrigen.length === 1 ? seccionesOrigen[0].seccionId : null;
+    origenSeleccionado =
+      seccionesOrigen.length === 1 ? seccionesOrigen[0].seccionId : null;
     modalCopiarAbierto = true;
   }
 
   async function copiarAlumnos() {
     if (!origenSeleccionado) {
-      error = 'Selecciona un bimestre de origen.';
+      error = "Selecciona un bimestre de origen.";
       return;
     }
 
     copiando = true;
-    error = '';
-    exito = '';
+    error = "";
+    exito = "";
 
     try {
       const res = await fetch(`/api/alumnos/copiar/${seccionId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ origenSeccionId: origenSeleccionado }),
       });
       const json = await res.json();
 
       if (!res.ok) {
-        error = json.error ?? 'Error al copiar alumnos.';
+        error = json.error ?? "Error al copiar alumnos.";
         return;
       }
 
-      exito = `Se copiaron ${json.data.copiados} alumno${json.data.copiados !== 1 ? 's' : ''} correctamente.`;
+      exito = `Se copiaron ${json.data.copiados} alumno${json.data.copiados !== 1 ? "s" : ""} correctamente.`;
       modalCopiarAbierto = false;
 
       // Recargar lista desde servidor
       const res2 = await fetch(`/api/alumnos/${seccionId}`);
       const json2 = await res2.json();
       if (res2.ok) lista = json2.data;
-
     } catch {
-      error = 'No se pudo conectar con el servidor.';
+      error = "No se pudo conectar con el servidor.";
     } finally {
       copiando = false;
     }
@@ -74,11 +74,62 @@
   let importando = false;
   let archivoTxt: FileList | null = null;
 
+  // Pegar lista (textarea)
+  let modalPegarAbierto = false;
+  let textoPegado = "";
+  let pegando = false;
+
+  function abrirPegar() {
+    textoPegado = "";
+    modalPegarAbierto = true;
+    error = "";
+  }
+
+  async function importarPegado() {
+    const lineas = textoPegado
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean);
+    if (!lineas.length) {
+      error = "Escribe o pega al menos un nombre.";
+      return;
+    }
+
+    pegando = true;
+    error = "";
+    exito = "";
+
+    try {
+      const res = await fetch(`/api/alumnos/importar/${seccionId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lineas }),
+      });
+      const json = await res.json();
+
+      if (!res.ok) {
+        error = json.error ?? "Error al importar.";
+        return;
+      }
+
+      exito = `Se importaron ${json.data.importados} alumno${json.data.importados !== 1 ? "s" : ""}.`;
+      modalPegarAbierto = false;
+
+      const res2 = await fetch(`/api/alumnos/${seccionId}`);
+      const json2 = await res2.json();
+      if (res2.ok) lista = json2.data;
+    } catch {
+      error = "No se pudo conectar con el servidor.";
+    } finally {
+      pegando = false;
+    }
+  }
+
   function abrirCrear() {
     editando = null;
-    formNombre = '';
-    formApellido = '';
-    formCodigo = '';
+    formNombre = "";
+    formApellido = "";
+    formCodigo = "";
     modalAbierto = true;
   }
 
@@ -86,23 +137,23 @@
     editando = a;
     formNombre = a.nombre;
     formApellido = a.apellido;
-    formCodigo = a.codigo ?? '';
+    formCodigo = a.codigo ?? "";
     modalAbierto = true;
   }
 
   function cerrarModal() {
     modalAbierto = false;
-    error = '';
+    error = "";
   }
 
   function limpiarMensajes() {
-    error = '';
-    exito = '';
+    error = "";
+    exito = "";
   }
 
   async function guardar() {
     if (!formNombre.trim() || !formApellido.trim()) {
-      error = 'Nombre y apellido son obligatorios.';
+      error = "Nombre y apellido son obligatorios.";
       return;
     }
 
@@ -110,7 +161,7 @@
     limpiarMensajes();
 
     const url = `/api/alumnos/${seccionId}`;
-    const method = editando ? 'PUT' : 'POST';
+    const method = editando ? "PUT" : "POST";
     const body = {
       ...(editando ? { id: editando.id } : {}),
       nombre: formNombre.trim(),
@@ -121,27 +172,27 @@
     try {
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
       const json = await res.json();
 
       if (!res.ok) {
-        error = json.error ?? 'Error al guardar.';
+        error = json.error ?? "Error al guardar.";
         return;
       }
 
       if (editando) {
-        lista = lista.map(a => a.id === editando!.id ? json.data : a);
-        exito = 'Alumno actualizado.';
+        lista = lista.map((a) => (a.id === editando!.id ? json.data : a));
+        exito = "Alumno actualizado.";
       } else {
         lista = [...lista, json.data];
-        exito = 'Alumno agregado.';
+        exito = "Alumno agregado.";
       }
 
       cerrarModal();
     } catch {
-      error = 'No se pudo conectar con el servidor.';
+      error = "No se pudo conectar con el servidor.";
     } finally {
       cargando = false;
     }
@@ -155,21 +206,21 @@
 
     try {
       const res = await fetch(`/api/alumnos/${seccionId}`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: a.id }),
       });
       const json = await res.json();
 
       if (!res.ok) {
-        error = json.error ?? 'Error al eliminar.';
+        error = json.error ?? "Error al eliminar.";
         return;
       }
 
-      lista = lista.map(x => x.id === a.id ? { ...x, estado: 0 } : x);
-      exito = 'Alumno desactivado.';
+      lista = lista.map((x) => (x.id === a.id ? { ...x, estado: 0 } : x));
+      exito = "Alumno desactivado.";
     } catch {
-      error = 'No se pudo conectar con el servidor.';
+      error = "No se pudo conectar con el servidor.";
     } finally {
       cargando = false;
     }
@@ -183,17 +234,20 @@
 
     try {
       const texto = await archivoTxt[0].text();
-      const lineas = texto.split('\n').map(l => l.trim()).filter(Boolean);
+      const lineas = texto
+        .split("\n")
+        .map((l) => l.trim())
+        .filter(Boolean);
 
       const res = await fetch(`/api/alumnos/importar/${seccionId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ lineas }),
       });
       const json = await res.json();
 
       if (!res.ok) {
-        error = json.error ?? 'Error al importar.';
+        error = json.error ?? "Error al importar.";
         return;
       }
 
@@ -203,23 +257,37 @@
       const res2 = await fetch(`/api/alumnos/${seccionId}`);
       const json2 = await res2.json();
       if (res2.ok) lista = json2.data;
-
     } catch {
-      error = 'No se pudo leer el archivo.';
+      error = "No se pudo leer el archivo.";
     } finally {
       importando = false;
       archivoTxt = null;
     }
   }
 
-  $: activos = lista.filter(a => a.estado === 1);
-  $: inactivos = lista.filter(a => a.estado === 0);
+  // Orden alfabético siempre
+  function sortAlumnos(arr: Alumno[]): Alumno[] {
+    return [...arr].sort((a, b) => {
+      const ap = a.apellido.localeCompare(b.apellido, "es", {
+        sensitivity: "base",
+      });
+      return ap !== 0
+        ? ap
+        : a.nombre.localeCompare(b.nombre, "es", { sensitivity: "base" });
+    });
+  }
+
+  $: activos = sortAlumnos(lista.filter((a) => a.estado === 1));
+  $: inactivos = sortAlumnos(lista.filter((a) => a.estado === 0));
 </script>
 
 <!-- Barra superior -->
 <div class="flex items-center justify-between mb-4 gap-3 flex-wrap">
   <span class="text-sm text-gray-500">
-    {activos.length} alumno{activos.length !== 1 ? 's' : ''} activo{activos.length !== 1 ? 's' : ''}
+    {activos.length} alumno{activos.length !== 1 ? "s" : ""} activo{activos.length !==
+    1
+      ? "s"
+      : ""}
   </span>
 
   <div class="flex items-center gap-2">
@@ -230,27 +298,87 @@
         class="flex items-center gap-1.5 text-sm border rounded-lg px-3 py-2 transition-colors cursor-pointer btn-copiar"
       >
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-          <rect x="1" y="4" width="10" height="11" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
-          <path d="M5 4V3a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-          <path d="M6 10l2 2 3-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          <rect
+            x="1"
+            y="4"
+            width="10"
+            height="11"
+            rx="1.5"
+            stroke="currentColor"
+            stroke-width="1.4"
+          />
+          <path
+            d="M5 4V3a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-1"
+            stroke="currentColor"
+            stroke-width="1.4"
+            stroke-linecap="round"
+          />
+          <path
+            d="M6 10l2 2 3-3"
+            stroke="currentColor"
+            stroke-width="1.4"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
         </svg>
         Copiar de otro bimestre
       </button>
     {/if}
-    <!-- Importar .txt -->
-    <label class="flex items-center gap-1.5 text-sm text-gray-600 border border-gray-300
-                  rounded-lg px-3 py-2 hover:bg-gray-50 cursor-pointer transition-colors">
+    <!-- Pegar lista -->
+    <button
+      on:click={abrirPegar}
+      class="flex items-center gap-1.5 text-sm text-gray-600 border border-gray-300
+             rounded-lg px-3 py-2 hover:bg-gray-50 cursor-pointer transition-colors"
+    >
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-        <path d="M8 2v8M4 6l4 4 4-4M2 12h12" stroke="currentColor" stroke-width="1.5"
-              stroke-linecap="round" stroke-linejoin="round"/>
+        <rect
+          x="4"
+          y="1"
+          width="8"
+          height="3"
+          rx="1"
+          stroke="currentColor"
+          stroke-width="1.4"
+        />
+        <path
+          d="M4 2H3a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1h-1"
+          stroke="currentColor"
+          stroke-width="1.4"
+          stroke-linecap="round"
+        />
+        <path
+          d="M5 8h6M5 11h4"
+          stroke="currentColor"
+          stroke-width="1.3"
+          stroke-linecap="round"
+        />
       </svg>
-      {importando ? 'Importando...' : 'Importar .txt'}
+      Pegar lista
+    </button>
+    <!-- Importar .txt -->
+    <label
+      class="flex items-center gap-1.5 text-sm text-gray-600 border border-gray-300
+                  rounded-lg px-3 py-2 hover:bg-gray-50 cursor-pointer transition-colors"
+    >
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+        <path
+          d="M8 2v8M4 6l4 4 4-4M2 12h12"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+      {importando ? "Importando..." : "Importar .txt"}
       <input
         type="file"
         accept=".txt"
         class="hidden"
         disabled={importando}
-        on:change={e => { archivoTxt = (e.target as HTMLInputElement).files; importarTxt(); }}
+        on:change={(e) => {
+          archivoTxt = (e.target as HTMLInputElement).files;
+          importarTxt();
+        }}
       />
     </label>
 
@@ -261,8 +389,12 @@
              hover:bg-blue-700 rounded-lg px-3 py-2 transition-colors cursor-pointer"
     >
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-        <path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="1.5"
-              stroke-linecap="round"/>
+        <path
+          d="M8 2v12M2 8h12"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"
+        />
       </svg>
       Nuevo alumno
     </button>
@@ -271,12 +403,16 @@
 
 <!-- Mensajes -->
 {#if error}
-  <p class="mb-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+  <p
+    class="mb-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2"
+  >
     {error}
   </p>
 {/if}
 {#if exito}
-  <p class="mb-3 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+  <p
+    class="mb-3 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2"
+  >
     {exito}
   </p>
 {/if}
@@ -285,16 +421,27 @@
 {#if activos.length === 0}
   <div class="text-center py-16 text-gray-400">
     <p class="text-sm">No hay alumnos registrados.</p>
-    <p class="text-sm mt-1">Importa un archivo .txt o agrega uno manualmente.</p>
+    <p class="text-sm mt-1">
+      Importa un archivo .txt o agrega uno manualmente.
+    </p>
   </div>
 {:else}
   <div class="rounded-xl border border-gray-200 overflow-hidden">
     <table class="w-full text-sm">
       <thead class="bg-gray-50 border-b border-gray-200">
         <tr>
-          <th class="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">#</th>
-          <th class="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Apellidos y nombres</th>
-          <th class="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide hidden sm:table-cell">Código</th>
+          <th
+            class="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide"
+            >#</th
+          >
+          <th
+            class="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide"
+            >Apellidos y nombres</th
+          >
+          <th
+            class="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide hidden sm:table-cell"
+            >Código</th
+          >
           <th class="px-4 py-3"></th>
         </tr>
       </thead>
@@ -306,7 +453,7 @@
               {alumno.apellido}, {alumno.nombre}
             </td>
             <td class="px-4 py-3 text-gray-400 hidden sm:table-cell">
-              {alumno.codigo ?? '—'}
+              {alumno.codigo ?? "—"}
             </td>
             <td class="px-4 py-3">
               <div class="flex items-center justify-end gap-2">
@@ -316,8 +463,13 @@
                   title="Editar"
                 >
                   <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-                    <path d="M11 2l3 3-9 9H2v-3l9-9z" stroke="currentColor" stroke-width="1.5"
-                          stroke-linecap="round" stroke-linejoin="round"/>
+                    <path
+                      d="M11 2l3 3-9 9H2v-3l9-9z"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
                   </svg>
                 </button>
                 <button
@@ -326,9 +478,13 @@
                   title="Desactivar"
                 >
                   <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-                    <path d="M2 4h12M5 4V2h6v2M6 7v5M10 7v5M3 4l1 10h8l1-10"
-                          stroke="currentColor" stroke-width="1.5"
-                          stroke-linecap="round" stroke-linejoin="round"/>
+                    <path
+                      d="M2 4h12M5 4V2h6v2M6 7v5M10 7v5M3 4l1 10h8l1-10"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
                   </svg>
                 </button>
               </div>
@@ -343,15 +499,22 @@
 <!-- Alumnos inactivos (colapsado) -->
 {#if inactivos.length > 0}
   <details class="mt-4">
-    <summary class="text-xs text-gray-400 cursor-pointer hover:text-gray-600 select-none">
-      {inactivos.length} alumno{inactivos.length !== 1 ? 's' : ''} inactivo{inactivos.length !== 1 ? 's' : ''}
+    <summary
+      class="text-xs text-gray-400 cursor-pointer hover:text-gray-600 select-none"
+    >
+      {inactivos.length} alumno{inactivos.length !== 1 ? "s" : ""} inactivo{inactivos.length !==
+      1
+        ? "s"
+        : ""}
     </summary>
     <div class="mt-2 rounded-xl border border-gray-100 overflow-hidden">
       <table class="w-full text-sm">
         <tbody class="divide-y divide-gray-50">
           {#each inactivos as alumno}
             <tr class="opacity-50">
-              <td class="px-4 py-2 text-gray-500">{alumno.apellido}, {alumno.nombre}</td>
+              <td class="px-4 py-2 text-gray-500"
+                >{alumno.apellido}, {alumno.nombre}</td
+              >
             </tr>
           {/each}
         </tbody>
@@ -362,35 +525,71 @@
 
 <!-- Modal copiar alumnos -->
 {#if modalCopiarAbierto}
-  <div class="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4">
+  <div
+    class="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4"
+  >
     <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
-
-      <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1.5rem;">
-        <div style="width:40px;height:40px;border-radius:.75rem;background:#EEF2F9;border:1px solid rgba(27,58,107,.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <div
+        style="display:flex;align-items:center;gap:.75rem;margin-bottom:1.5rem;"
+      >
+        <div
+          style="width:40px;height:40px;border-radius:.75rem;background:#EEF2F9;border:1px solid rgba(27,58,107,.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;"
+        >
           <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
-            <rect x="1" y="4" width="10" height="11" rx="1.5" stroke="#1B3A6B" stroke-width="1.4"/>
-            <path d="M5 4V3a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-1" stroke="#1B3A6B" stroke-width="1.4" stroke-linecap="round"/>
-            <path d="M6 10l2 2 3-3" stroke="#1B3A6B" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+            <rect
+              x="1"
+              y="4"
+              width="10"
+              height="11"
+              rx="1.5"
+              stroke="#1B3A6B"
+              stroke-width="1.4"
+            />
+            <path
+              d="M5 4V3a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-1"
+              stroke="#1B3A6B"
+              stroke-width="1.4"
+              stroke-linecap="round"
+            />
+            <path
+              d="M6 10l2 2 3-3"
+              stroke="#1B3A6B"
+              stroke-width="1.4"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
           </svg>
         </div>
         <div>
-          <h2 style="font-size:.95rem;font-weight:600;color:#1A2332;margin:0;">Copiar alumnos</h2>
-          <p style="font-size:.78rem;color:#8A96AA;margin:.15rem 0 0;">Importa la lista de otro bimestre a esta sección.</p>
+          <h2 style="font-size:.95rem;font-weight:600;color:#1A2332;margin:0;">
+            Copiar alumnos
+          </h2>
+          <p style="font-size:.78rem;color:#8A96AA;margin:.15rem 0 0;">
+            Importa la lista de otro bimestre a esta sección.
+          </p>
         </div>
       </div>
 
-      <label for="origen-select" style="display:block;font-size:.8rem;font-weight:500;color:#4A5672;margin-bottom:.5rem;">
+      <label
+        for="origen-select"
+        style="display:block;font-size:.8rem;font-weight:500;color:#4A5672;margin-bottom:.5rem;"
+      >
         Bimestre de origen
       </label>
 
       {#if seccionesOrigen.length === 1}
         <!-- Solo una opción: mostrar como info, no como select -->
-        <div style="background:#F5F3EE;border:1px solid #DDE3EE;border-radius:.625rem;padding:.75rem 1rem;">
+        <div
+          style="background:#F5F3EE;border:1px solid #DDE3EE;border-radius:.625rem;padding:.75rem 1rem;"
+        >
           <p style="font-size:.85rem;font-weight:500;color:#1A2332;margin:0;">
             Sección {seccionesOrigen[0].seccionNombre}
           </p>
           <p style="font-size:.75rem;color:#8A96AA;margin:.2rem 0 0;">
-            {seccionesOrigen[0].totalAlumnos} alumno{seccionesOrigen[0].totalAlumnos !== 1 ? 's' : ''} activo{seccionesOrigen[0].totalAlumnos !== 1 ? 's' : ''}
+            {seccionesOrigen[0].totalAlumnos} alumno{seccionesOrigen[0]
+              .totalAlumnos !== 1
+              ? "s"
+              : ""} activo{seccionesOrigen[0].totalAlumnos !== 1 ? "s" : ""}
           </p>
         </div>
       {:else}
@@ -402,30 +601,54 @@
           <option value={null}>Selecciona un bimestre...</option>
           {#each seccionesOrigen as src}
             <option value={src.seccionId}>
-              Sección {src.seccionNombre} — {src.totalAlumnos} alumno{src.totalAlumnos !== 1 ? 's' : ''}
+              Sección {src.seccionNombre} — {src.totalAlumnos} alumno{src.totalAlumnos !==
+              1
+                ? "s"
+                : ""}
             </option>
           {/each}
         </select>
       {/if}
 
-      <div style="background:#EEF2F9;border:1px solid rgba(27,58,107,.14);border-radius:.6rem;padding:.65rem .875rem;margin:1rem 0 0;display:flex;gap:.5rem;align-items:flex-start;">
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="flex-shrink:0;margin-top:.1rem;">
-          <circle cx="8" cy="8" r="6.5" stroke="#1B3A6B" stroke-width="1.3"/>
-          <path d="M8 7v4" stroke="#1B3A6B" stroke-width="1.4" stroke-linecap="round"/>
-          <circle cx="8" cy="5.5" r=".6" fill="#1B3A6B"/>
+      <div
+        style="background:#EEF2F9;border:1px solid rgba(27,58,107,.14);border-radius:.6rem;padding:.65rem .875rem;margin:1rem 0 0;display:flex;gap:.5rem;align-items:flex-start;"
+      >
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 16 16"
+          fill="none"
+          style="flex-shrink:0;margin-top:.1rem;"
+        >
+          <circle cx="8" cy="8" r="6.5" stroke="#1B3A6B" stroke-width="1.3" />
+          <path
+            d="M8 7v4"
+            stroke="#1B3A6B"
+            stroke-width="1.4"
+            stroke-linecap="round"
+          />
+          <circle cx="8" cy="5.5" r=".6" fill="#1B3A6B" />
         </svg>
         <p style="font-size:.75rem;color:#4A5672;margin:0;line-height:1.5;">
-          Solo se copian los alumnos que <strong>no están ya registrados</strong> en esta sección. Los existentes no se duplican.
+          Solo se copian los alumnos que <strong>no están ya registrados</strong
+          > en esta sección. Los existentes no se duplican.
         </p>
       </div>
 
       {#if error}
-        <p class="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
+        <p
+          class="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2"
+        >
+          {error}
+        </p>
       {/if}
 
       <div class="flex justify-end gap-2 mt-5">
         <button
-          on:click={() => { modalCopiarAbierto = false; error = ''; }}
+          on:click={() => {
+            modalCopiarAbierto = false;
+            error = "";
+          }}
           class="text-sm text-gray-600 border border-gray-300 rounded-lg px-4 py-2 hover:bg-gray-50 transition-colors cursor-pointer"
         >
           Cancelar
@@ -435,26 +658,150 @@
           disabled={copiando || !origenSeleccionado}
           class="btn-confirmar-copiar"
         >
-          {copiando ? 'Copiando...' : 'Copiar alumnos'}
+          {copiando ? "Copiando..." : "Copiar alumnos"}
         </button>
       </div>
+    </div>
+  </div>
+{/if}
 
+<!-- Modal pegar lista -->
+{#if modalPegarAbierto}
+  <div
+    class="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4"
+  >
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+      <div
+        style="display:flex;align-items:center;gap:.75rem;margin-bottom:1.25rem;"
+      >
+        <div
+          style="width:40px;height:40px;border-radius:.75rem;background:#EEF2F9;border:1px solid rgba(27,58,107,.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;"
+        >
+          <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
+            <rect
+              x="4"
+              y="1"
+              width="8"
+              height="3"
+              rx="1"
+              stroke="#1B3A6B"
+              stroke-width="1.4"
+            />
+            <path
+              d="M4 2H3a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1h-1"
+              stroke="#1B3A6B"
+              stroke-width="1.4"
+              stroke-linecap="round"
+            />
+            <path
+              d="M5 8h6M5 11h4"
+              stroke="#1B3A6B"
+              stroke-width="1.3"
+              stroke-linecap="round"
+            />
+          </svg>
+        </div>
+        <div>
+          <h2 style="font-size:.95rem;font-weight:600;color:#1A2332;margin:0;">
+            Pegar lista de alumnos
+          </h2>
+          <p style="font-size:.78rem;color:#8A96AA;margin:.15rem 0 0;">
+            Copia y pega desde Word, WhatsApp o cualquier lista.
+          </p>
+        </div>
+      </div>
+
+      <!-- Instrucciones -->
+      <div
+        style="background:#F5F3EE;border:1px solid #DDE3EE;border-radius:.625rem;padding:.65rem .875rem;margin-bottom:1rem;"
+      >
+        <p
+          style="font-size:.75rem;font-weight:600;color:#4A5672;margin:0 0 .3rem;"
+        >
+          Formatos aceptados (uno por línea):
+        </p>
+        <code
+          style="font-size:.72rem;color:#1B3A6B;display:block;line-height:1.7;"
+        >
+          GARCIA LOPEZ, Juan Carlos<br />
+          TORRES RIOS Maria Elena<br />
+          CUBA MAMANI Pedro
+        </code>
+        <p style="font-size:.7rem;color:#8A96AA;margin:.4rem 0 0;">
+          Con o sin coma. Si hay coma: antes = apellidos, después = nombres.<br
+          />
+          Sin coma: las 2 primeras palabras = apellidos, el resto = nombres.
+        </p>
+      </div>
+
+      <textarea
+        bind:value={textoPegado}
+        placeholder="Pega aquí la lista..."
+        rows="8"
+        style="width:100%;border:1px solid #DDE3EE;border-radius:.625rem;padding:.6rem .75rem;
+               font-size:.82rem;line-height:1.6;resize:vertical;outline:none;
+               color:#1A2332;background:#fff;font-family:monospace;"
+      ></textarea>
+
+      {#if textoPegado.trim()}
+        <p style="font-size:.72rem;color:#8A96AA;margin:.4rem 0 0;">
+          {textoPegado.split("\n").filter((l) => l.trim()).length} línea{textoPegado
+            .split("\n")
+            .filter((l) => l.trim()).length !== 1
+            ? "s"
+            : ""} detectada{textoPegado.split("\n").filter((l) => l.trim())
+            .length !== 1
+            ? "s"
+            : ""}
+        </p>
+      {/if}
+
+      {#if error}
+        <p
+          class="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2"
+        >
+          {error}
+        </p>
+      {/if}
+
+      <div class="flex justify-end gap-2 mt-4">
+        <button
+          on:click={() => {
+            modalPegarAbierto = false;
+            error = "";
+          }}
+          class="text-sm text-gray-600 border border-gray-300 rounded-lg px-4 py-2 hover:bg-gray-50 transition-colors cursor-pointer"
+        >
+          Cancelar
+        </button>
+        <button
+          on:click={importarPegado}
+          disabled={pegando || !textoPegado.trim()}
+          class="btn-confirmar-copiar"
+        >
+          {pegando ? "Importando..." : "Importar alumnos"}
+        </button>
+      </div>
     </div>
   </div>
 {/if}
 
 <!-- Modal crear/editar -->
 {#if modalAbierto}
-  <div class="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4">
+  <div
+    class="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4"
+  >
     <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
-
       <h2 class="text-base font-semibold text-gray-900 mb-5">
-        {editando ? 'Editar alumno' : 'Nuevo alumno'}
+        {editando ? "Editar alumno" : "Nuevo alumno"}
       </h2>
 
       <div class="flex flex-col gap-4">
         <div>
-          <label for="form-apellido" class="block text-sm font-medium text-gray-700 mb-1">
+          <label
+            for="form-apellido"
+            class="block text-sm font-medium text-gray-700 mb-1"
+          >
             Apellidos
           </label>
           <input
@@ -467,7 +814,10 @@
           />
         </div>
         <div>
-          <label for="form-nombre" class="block text-sm font-medium text-gray-700 mb-1">
+          <label
+            for="form-nombre"
+            class="block text-sm font-medium text-gray-700 mb-1"
+          >
             Nombres
           </label>
           <input
@@ -480,7 +830,10 @@
           />
         </div>
         <div>
-          <label for="form-codigo" class="block text-sm font-medium text-gray-700 mb-1">
+          <label
+            for="form-codigo"
+            class="block text-sm font-medium text-gray-700 mb-1"
+          >
             Código <span class="text-gray-400 font-normal">(opcional)</span>
           </label>
           <input
@@ -495,7 +848,9 @@
       </div>
 
       {#if error}
-        <p class="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+        <p
+          class="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2"
+        >
           {error}
         </p>
       {/if}
@@ -515,67 +870,124 @@
                  disabled:bg-blue-300 rounded-lg px-4 py-2
                  transition-colors cursor-pointer disabled:cursor-not-allowed"
         >
-          {cargando ? 'Guardando...' : 'Guardar'}
+          {cargando ? "Guardando..." : "Guardar"}
         </button>
       </div>
-
     </div>
   </div>
 {/if}
+
 <style>
   /* ── Institutional Blue Design System ── */
-  :global(.bg-blue-600)                   { background-color: #1B3A6B !important; }
-  :global(.bg-blue-500)                   { background-color: #2A5298 !important; }
-  :global(.bg-blue-50)                    { background-color: #EEF2F9 !important; }
-  :global(.bg-blue-100)                   { background-color: #D6E3F5 !important; }
-  :global(.hover\:bg-blue-700:hover)      { background-color: #2A5298 !important; }
-  :global(.hover\:bg-blue-50:hover)       { background-color: #EEF2F9 !important; }
-  :global(.hover\:bg-blue-100:hover)      { background-color: #D6E3F5 !important; }
-  :global(.hover\:bg-blue-100\/70:hover)  { background-color: rgba(214,227,245,.7) !important; }
-  :global(.disabled\:bg-blue-300)         { background-color: rgba(27,58,107,.32) !important; }
-  :global(.text-blue-600)                 { color: #1B3A6B !important; }
-  :global(.text-blue-700)                 { color: #1B3A6B !important; }
-  :global(.text-blue-800)                 { color: #0F2A52 !important; }
-  :global(.text-blue-500)                 { color: #2A5298 !important; }
-  :global(.hover\:text-blue-600:hover)    { color: #1B3A6B !important; }
-  :global(.hover\:text-blue-700:hover)    { color: #0F2A52 !important; }
-  :global(.group-hover\:text-blue-600)    { color: #1B3A6B !important; }
-  :global(.group-hover\:text-blue-400)    { color: rgba(27,58,107,.55) !important; }
-  :global(.border-blue-500)              { border-color: #1B3A6B !important; }
-  :global(.border-blue-300)              { border-color: rgba(27,58,107,.35) !important; }
-  :global(.border-blue-200)              { border-color: rgba(27,58,107,.2) !important; }
-  :global(.border-blue-100)              { border-color: rgba(27,58,107,.12) !important; }
-  :global(.focus\:ring-blue-500)         { --tw-ring-color: rgba(27,58,107,.4) !important; }
-  :global(.focus\:ring-blue-400)         { --tw-ring-color: rgba(27,58,107,.35) !important; }
-  :global(.divide-blue-100 > * + *)      { border-color: rgba(27,58,107,.1) !important; }
+  :global(.bg-blue-600) {
+    background-color: #1b3a6b !important;
+  }
+  :global(.bg-blue-500) {
+    background-color: #2a5298 !important;
+  }
+  :global(.bg-blue-50) {
+    background-color: #eef2f9 !important;
+  }
+  :global(.bg-blue-100) {
+    background-color: #d6e3f5 !important;
+  }
+  :global(.hover\:bg-blue-700:hover) {
+    background-color: #2a5298 !important;
+  }
+  :global(.hover\:bg-blue-50:hover) {
+    background-color: #eef2f9 !important;
+  }
+  :global(.hover\:bg-blue-100:hover) {
+    background-color: #d6e3f5 !important;
+  }
+  :global(.hover\:bg-blue-100\/70:hover) {
+    background-color: rgba(214, 227, 245, 0.7) !important;
+  }
+  :global(.disabled\:bg-blue-300) {
+    background-color: rgba(27, 58, 107, 0.32) !important;
+  }
+  :global(.text-blue-600) {
+    color: #1b3a6b !important;
+  }
+  :global(.text-blue-700) {
+    color: #1b3a6b !important;
+  }
+  :global(.text-blue-800) {
+    color: #0f2a52 !important;
+  }
+  :global(.text-blue-500) {
+    color: #2a5298 !important;
+  }
+  :global(.hover\:text-blue-600:hover) {
+    color: #1b3a6b !important;
+  }
+  :global(.hover\:text-blue-700:hover) {
+    color: #0f2a52 !important;
+  }
+  :global(.group-hover\:text-blue-600) {
+    color: #1b3a6b !important;
+  }
+  :global(.group-hover\:text-blue-400) {
+    color: rgba(27, 58, 107, 0.55) !important;
+  }
+  :global(.border-blue-500) {
+    border-color: #1b3a6b !important;
+  }
+  :global(.border-blue-300) {
+    border-color: rgba(27, 58, 107, 0.35) !important;
+  }
+  :global(.border-blue-200) {
+    border-color: rgba(27, 58, 107, 0.2) !important;
+  }
+  :global(.border-blue-100) {
+    border-color: rgba(27, 58, 107, 0.12) !important;
+  }
+  :global(.focus\:ring-blue-500) {
+    --tw-ring-color: rgba(27, 58, 107, 0.4) !important;
+  }
+  :global(.focus\:ring-blue-400) {
+    --tw-ring-color: rgba(27, 58, 107, 0.35) !important;
+  }
+  :global(.divide-blue-100 > * + *) {
+    border-color: rgba(27, 58, 107, 0.1) !important;
+  }
   /* Progress bar */
-  :global(.bg-blue-500.rounded-full)     { background-color: #1B3A6B !important; }
+  :global(.bg-blue-500.rounded-full) {
+    background-color: #1b3a6b !important;
+  }
   /* "Evaluar" link */
   :global(.text-blue-600.border.border-blue-200) {
-    color: #1B3A6B !important;
-    border-color: rgba(27,58,107,.22) !important;
+    color: #1b3a6b !important;
+    border-color: rgba(27, 58, 107, 0.22) !important;
   }
 
   /* ── Copiar alumnos buttons ── */
   .btn-copiar {
-    color: #1B3A6B;
-    border-color: rgba(27,58,107,.28);
-    background: #EEF2F9;
+    color: #1b3a6b;
+    border-color: rgba(27, 58, 107, 0.28);
+    background: #eef2f9;
   }
-  .btn-copiar:hover { background: #D6E3F5; }
+  .btn-copiar:hover {
+    background: #d6e3f5;
+  }
 
   .btn-confirmar-copiar {
-    font-size: .875rem;
+    font-size: 0.875rem;
     font-weight: 500;
     color: #fff;
-    background: #1B3A6B;
+    background: #1b3a6b;
     border: none;
-    border-radius: .625rem;
-    padding: .55rem 1.1rem;
+    border-radius: 0.625rem;
+    padding: 0.55rem 1.1rem;
     cursor: pointer;
-    transition: background .2s;
-    box-shadow: 0 3px 10px rgba(27,58,107,.25);
+    transition: background 0.2s;
+    box-shadow: 0 3px 10px rgba(27, 58, 107, 0.25);
   }
-  .btn-confirmar-copiar:hover:not(:disabled) { background: #2A5298; }
-  .btn-confirmar-copiar:disabled { background: rgba(27,58,107,.32); cursor: not-allowed; }
+  .btn-confirmar-copiar:hover:not(:disabled) {
+    background: #2a5298;
+  }
+  .btn-confirmar-copiar:disabled {
+    background: rgba(27, 58, 107, 0.32);
+    cursor: not-allowed;
+  }
 </style>

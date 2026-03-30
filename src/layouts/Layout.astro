@@ -4,6 +4,7 @@ import Breadcrumb from '../components/astro/Breadcrumb.astro';
 import { getSession } from 'auth-astro/server';
 import { ClientRouter } from 'astro:transitions';
 import FooterBeta from '../components/astro/FooterBeta.astro';
+import Analytics from '@vercel/analytics/astro'
 
 interface Props {
   title: string;
@@ -23,6 +24,7 @@ const docente = Astro.locals.docente;
 		<link rel="icon" href="/favicon.ico" />
 		<meta name="generator" content={Astro.generator} />
 		<title>{title} — Registro Docente</title>
+		<Analytics/>
 		<ClientRouter />
 	</head>
 	<body class="bg-gray-50 min-h-screen text-gray-900 antialiased">

@@ -1,0 +1,58 @@
+---
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout title="Apoyar el proyecto" showHeader={false}>
+    <div class="max-w-md mx-auto py-12 px-4 text-center">
+        <a
+            href="/"
+            class="text-sm text-gray-400 hover:text-gray-600 transition-colors mb-8 block text-left"
+        >
+            ← Volver
+        </a>
+
+        <div class="text-3xl mb-4">🙏</div>
+
+        <h1 class="text-2xl font-semibold text-gray-900 mb-3">¿Te fue útil?</h1>
+
+        <p class="text-sm text-gray-500 mb-8 leading-relaxed">
+            Este sistema es un proyecto experimental gratuito, desarrollado
+            fuera del horario de trabajo como investigación académica. Si te
+            ahorró tiempo o simplificó tu trabajo, puedes apoyar con lo que
+            gustes por Yape. No es obligatorio — con que lo uses y me cuentes si
+            te sirvió es suficiente. 😊
+        </p>
+
+        <!-- QR de Yape -->
+        <div
+            class="bg-white border border-gray-200 rounded-2xl p-6 mb-6 inline-block shadow-sm"
+        >
+            <p
+                class="text-xs text-gray-400 mb-3 font-medium uppercase tracking-wide"
+            >
+                Yape — Victor Tuesta
+            </p>
+            <img
+                src="/yape-qr.png"
+                alt="QR Yape"
+                class="w-48 h-48 rounded-xl mx-auto"
+            />
+        </div>
+
+        <div
+            class="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 text-sm text-amber-800 text-left"
+        >
+            <p class="font-medium mb-1">¿Encontraste algún error?</p>
+            <p class="text-amber-700 text-xs leading-relaxed">
+                Escríbeme a
+                <a
+                    href="mailto:vtuesta13@gmail.com"
+                    class="underline hover:no-underline"
+                >
+                    vtuesta13@gmail.com
+                </a>
+                y lo corrijo lo antes posible. Tu retroalimentación es lo más valioso.
+            </p>
+        </div>
+    </div>
+</Layout>

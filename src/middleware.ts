@@ -7,6 +7,8 @@ import type { Docente } from './lib/types';
 const PUBLIC_PATHS = [
   '/login',
   '/api/auth',
+  '/privacidad',   
+  '/donaciones',
 ];
 
 // Rutas que requieren sesión pero NO onboarding completo

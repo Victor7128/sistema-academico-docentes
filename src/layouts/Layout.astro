@@ -3,6 +3,7 @@ import '../styles/global.css'
 import Breadcrumb from '../components/astro/Breadcrumb.astro';
 import { getSession } from 'auth-astro/server';
 import { ClientRouter } from 'astro:transitions';
+import FooterBeta from '../components/astro/FooterBeta.astro';
 
 interface Props {
   title: string;
@@ -59,6 +60,7 @@ const docente = Astro.locals.docente;
 			<slot />
 		</main>
 
+		<FooterBeta />
 	</body>
 </html>
 

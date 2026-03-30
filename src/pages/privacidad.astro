@@ -1,0 +1,142 @@
+---
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout title="Política de privacidad" showHeader={false}>
+    <div class="max-w-2xl mx-auto py-12 px-4">
+        <a
+            href="/"
+            class="text-sm text-gray-400 hover:text-gray-600 transition-colors mb-8 block"
+        >
+            ← Volver
+        </a>
+
+        <h1 class="text-2xl font-semibold text-gray-900 mb-2">
+            Política de privacidad
+        </h1>
+        <p class="text-sm text-gray-400 mb-8">
+            Última actualización: junio 2025
+        </p>
+
+        <div
+            class="prose prose-sm prose-gray max-w-none space-y-6 text-gray-700 leading-relaxed"
+        >
+            <section>
+                <h2 class="text-base font-semibold text-gray-900 mb-2">
+                    1. ¿Qué es este sistema?
+                </h2>
+                <p>
+                    Registro Docente es un sistema web experimental desarrollado
+                    como proyecto de investigación académica. Su propósito es
+                    digitalizar el proceso de registro y evaluación pedagógica
+                    de docentes de educación secundaria en Perú, alineado al
+                    Currículo Nacional del MINEDU. <strong
+                        >No es un producto comercial.</strong
+                    >
+                </p>
+            </section>
+
+            <section>
+                <h2 class="text-base font-semibold text-gray-900 mb-2">
+                    2. ¿Qué datos recopilamos?
+                </h2>
+                <p>Al usar este sistema se almacenan los siguientes datos:</p>
+                <ul class="list-disc pl-5 space-y-1 mt-2">
+                    <li>
+                        <strong>De tu cuenta Google:</strong> nombre, correo electrónico
+                        e identificador único de Google (no almacenamos tu contraseña).
+                    </li>
+                    <li>
+                        <strong>De tu trabajo pedagógico:</strong> nombres de alumnos,
+                        secciones, grados, sesiones de aprendizaje, notas de evaluación
+                        y criterios que registres tú mismo.
+                    </li>
+                    <li>
+                        <strong>Técnicos:</strong> registros de acceso básicos para
+                        el funcionamiento del sistema.
+                    </li>
+                </ul>
+            </section>
+
+            <section>
+                <h2 class="text-base font-semibold text-gray-900 mb-2">
+                    3. ¿Para qué usamos tus datos?
+                </h2>
+                <ul class="list-disc pl-5 space-y-1 mt-2">
+                    <li>
+                        Para que puedas iniciar sesión de forma segura con tu
+                        cuenta Google.
+                    </li>
+                    <li>
+                        Para mostrarte y guardar tu propio registro pedagógico.
+                    </li>
+                    <li>
+                        Para evaluar si el sistema es útil en el contexto
+                        educativo peruano (investigación académica).
+                    </li>
+                </ul>
+                <p class="mt-2">
+                    <strong
+                        >No vendemos, compartimos ni cedemos tus datos a
+                        terceros.</strong
+                    >
+                    Los datos no se usan con fines publicitarios.
+                </p>
+            </section>
+
+            <section>
+                <h2 class="text-base font-semibold text-gray-900 mb-2">
+                    4. ¿Dónde se almacenan los datos?
+                </h2>
+                <p>
+                    Los datos se almacenan en una base de datos PostgreSQL
+                    alojada en
+                    <strong>Aiven</strong> (proveedor europeo con estándares de seguridad
+                    GDPR). El sistema web está alojado en servicios de nube con capa
+                    gratuita. Al ser un proyecto experimental, no garantizamos disponibilidad
+                    continua ni respaldo permanente de datos.
+                </p>
+            </section>
+
+            <section>
+                <h2 class="text-base font-semibold text-gray-900 mb-2">
+                    5. Naturaleza experimental del sistema
+                </h2>
+                <p>
+                    Este sistema se encuentra en fase beta. Pueden ocurrir
+                    errores, pérdida de datos o interrupciones del servicio sin
+                    previo aviso. <strong
+                        >No se recomienda su uso como único medio de registro
+                        oficial.</strong
+                    >
+                    Se sugiere mantener respaldos propios de la información importante.
+                </p>
+            </section>
+
+            <section>
+                <h2 class="text-base font-semibold text-gray-900 mb-2">
+                    6. Tus derechos
+                </h2>
+                <p>
+                    Puedes solicitar la eliminación completa de tu cuenta y
+                    datos en cualquier momento escribiendo a: <a
+                        href="mailto:vtuesta13@gmail.com"
+                        class="text-blue-600 hover:underline"
+                        >vtuesta13@gmail.com</a
+                    >. Tu solicitud será atendida en un plazo máximo de 7 días.
+                </p>
+            </section>
+
+            <section>
+                <h2 class="text-base font-semibold text-gray-900 mb-2">
+                    7. Cookies
+                </h2>
+                <p>
+                    El sistema utiliza una cookie de sesión para mantener tu
+                    inicio de sesión activo. No se usan cookies de seguimiento
+                    ni publicitarias.
+                </p>
+            </section>
+        </div>
+    </div>
+</Layout>

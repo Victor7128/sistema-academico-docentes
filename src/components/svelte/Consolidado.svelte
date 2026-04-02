@@ -10,10 +10,11 @@
         nota: string;
         observacion?: string | null;
     }[] = [];
-    export const consolidadosIniciales: { alumnoId: number; notaFinal: string }[] = [];
+    // @ts-ignore
+    export let consolidadosIniciales: { alumnoId: number; notaFinal: string }[] = [];
     export let curriculo: any = null;
-    export const bimestreId: number = 0;
-    export const seccionId: number = 0;
+    export let  bimestreId: number = 0;
+    export let  seccionId: number = 0;
     export let seccionNombre = "";
     export let gradoNombre   = "";
     export let bimestreNombre = "";

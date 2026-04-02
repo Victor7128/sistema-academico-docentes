@@ -1,42 +1,43 @@
 ---
-import Layout from '../../../../../../layouts/Layout.astro';
-import EvaluacionForm from '../../../../../../components/svelte/EvaluacionForm.svelte';
-import { query } from '../../../../../../lib/db';
-import { getCurriculoPorNombre } from '../../../../../../lib/curriculo/index';
-import type { Sesion, SesionCriterio, Alumno, Evaluacion } from '../../../../../../lib/types';
+import Layout from "../../../../../../layouts/Layout.astro";
+import AsistenciaForm from "../../../../../../components/svelte/AsistenciaForm.svelte";
+import EvaluacionForm from "../../../../../../components/svelte/EvaluacionForm.svelte";
+import { query } from "../../../../../../lib/db";
+import { getCurriculoPorNombre } from "../../../../../../lib/curriculo/index";
+import type {
+  Sesion,
+  SesionCriterio,
+  Alumno,
+  Evaluacion,
+  Asistencia,
+  EstadoAsistencia,
+} from "../../../../../../lib/types";
 
 const docente = Astro.locals.docente;
 const { bimestreId, gradoId, seccionId, sesionId } = Astro.params;
-if (!bimestreId || !gradoId || !seccionId || !sesionId) return Astro.redirect('/');
+if (!bimestreId || !gradoId || !seccionId || !sesionId)
+  return Astro.redirect("/");
 
-// ── 7 queries → 3: acceso en 1 JOIN, luego 2 en paralelo ─────────────────
-
-// 1. Verificar acceso completo + obtener nombres en un solo JOIN
 const [acceso] = await query<{
-  bNombre: string; bAnio: number;
+  bNombre: string;
+  bAnio: number;
   gNombre: string;
   sNombre: string;
 }>`
   SELECT
-    b.nombre  AS "bNombre",
-    b.anio    AS "bAnio",
-    g.nombre  AS "gNombre",
-    s.nombre  AS "sNombre"
+    b.nombre AS "bNombre", b.anio AS "bAnio",
+    g.nombre AS "gNombre", s.nombre AS "sNombre"
   FROM bimestre b
   JOIN docente_grado dg ON dg.docente_id = ${docente.id}
   JOIN grado g   ON g.id   = dg.grado_id
   JOIN seccion s ON s.grado_id = g.id
-  WHERE b.id         = ${bimestreId}
-    AND b.docente_id = ${docente.id}
-    AND g.id         = ${gradoId}
-    AND g.estado     = 1
-    AND s.id         = ${seccionId}
-    AND s.estado     = 1
+  WHERE b.id = ${bimestreId} AND b.docente_id = ${docente.id}
+    AND g.id = ${gradoId}   AND g.estado = 1
+    AND s.id = ${seccionId} AND s.estado = 1
 `;
-if (!acceso) return Astro.redirect('/');
+if (!acceso) return Astro.redirect("/");
 
-// 2. Sesión + alumnos + evaluaciones + curso: todo en paralelo
-const [sesionResult, alumnos, evaluaciones] = await Promise.all([
+const [sesionResult, alumnos, evaluaciones, asistencias] = await Promise.all([
   query<Sesion & { criterios: SesionCriterio[] }>`
     SELECT
       s.id, s.titulo, s.producto, s.fecha, s.estado,
@@ -54,9 +55,7 @@ const [sesionResult, alumnos, evaluaciones] = await Promise.all([
       ) AS criterios
     FROM sesion s
     LEFT JOIN sesion_criterio sc ON sc.sesion_id = s.id
-    WHERE s.id          = ${sesionId}
-      AND s.bimestre_id = ${bimestreId}
-      AND s.grado_id    = ${gradoId}
+    WHERE s.id = ${sesionId} AND s.bimestre_id = ${bimestreId} AND s.grado_id = ${gradoId}
     GROUP BY s.id
   `,
   query<Alumno>`
@@ -70,11 +69,22 @@ const [sesionResult, alumnos, evaluaciones] = await Promise.all([
       e.id,
       e.sesion_criterio_id AS "sesionCriterioId",
       e.alumno_id          AS "alumnoId",
-      e.nota,
-      e.observacion
+      e.nota, e.observacion
     FROM evaluacion e
     JOIN sesion_criterio sc ON e.sesion_criterio_id = sc.id
     WHERE sc.sesion_id = ${sesionId}
+  `,
+  query<{
+    alumnoId: number;
+    estado: EstadoAsistencia;
+    observacion: string | null;
+  }>`
+    SELECT
+      alumno_id  AS "alumnoId",
+      estado,
+      observacion
+    FROM asistencia
+    WHERE sesion_id = ${sesionId}
   `,
 ]);
 
@@ -82,21 +92,49 @@ const [sesion] = sesionResult;
 if (!sesion || sesion.estado === 0)
   return Astro.redirect(`/app/${bimestreId}/${gradoId}/${seccionId}/sesiones`);
 
-// Currículo: local, sin query adicional
-const curriculo = getCurriculoPorNombre(
-  docente.cursoNombre ?? ''
-) ?? null;
+const curriculo = getCurriculoPorNombre(docente.cursoNombre ?? "") ?? null;
 ---
 
-<Layout title={`Evaluación — ${sesion.titulo}`}>
+<Layout title={`Sesión — ${sesion.titulo}`}>
   <style>
-    .ph { font-family: 'DM Serif Display', serif; font-size: clamp(1.3rem, 3vw, 1.65rem); color: #1A2332; line-height: 1.2; }
-    .pm { font-size: .78rem; color: #8A96AA; margin-top: .2rem; }
-    .pbc { display: flex; align-items: center; gap: .3rem; font-size: .72rem; flex-wrap: wrap; margin-bottom: .6rem; }
-    .pbc a { color: #8A96AA; text-decoration: none; transition: color .15s; }
-    .pbc a:hover { color: #1B3A6B; }
-    .pbc-sep { color: #C8D3E8; }
-    .pbc-cur { color: #4A5672; font-weight: 500; }
+    .ph {
+      font-family: "DM Serif Display", serif;
+      font-size: clamp(1.3rem, 3vw, 1.65rem);
+      color: #1a2332;
+      line-height: 1.2;
+    }
+    .pm {
+      font-size: 0.78rem;
+      color: #8a96aa;
+      margin-top: 0.2rem;
+    }
+    .pbc {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-size: 0.72rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.6rem;
+    }
+    .pbc a {
+      color: #8a96aa;
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    .pbc a:hover {
+      color: #1b3a6b;
+    }
+    .pbc-sep {
+      color: #c8d3e8;
+    }
+    .pbc-cur {
+      color: #4a5672;
+      font-weight: 500;
+    }
+    .tab-panel--hidden {
+      display: none !important;
+      pointer-events: none;
+    }
   </style>
 
   <div style="margin-bottom:1.5rem;">
@@ -105,25 +143,97 @@ const curriculo = getCurriculoPorNombre(
       <span class="pbc-sep">›</span>
       <a href={`/app/${bimestreId}/${gradoId}`}>{acceso.gNombre}</a>
       <span class="pbc-sep">›</span>
-      <a href={`/app/${bimestreId}/${gradoId}/${seccionId}/sesiones`}>Sección {acceso.sNombre}</a>
+      <a href={`/app/${bimestreId}/${gradoId}/${seccionId}/sesiones`}
+        >Sección {acceso.sNombre}</a
+      >
       <span class="pbc-sep">›</span>
-      <span class="pbc-cur">Evaluación</span>
+      <span class="pbc-cur">{sesion.titulo}</span>
     </nav>
     <h1 class="ph">{sesion.titulo}</h1>
     <p class="pm">
-      {new Date(sesion.fecha + 'T12:00:00').toLocaleDateString('es-PE', {
-        weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
-      })}
-      {sesion.producto ? `· ${sesion.producto}` : ''}
+      {
+        new Date(sesion.fecha + "T12:00:00").toLocaleDateString("es-PE", {
+          weekday: "long",
+          day: "2-digit",
+          month: "long",
+          year: "numeric",
+        })
+      }
+      {sesion.producto ? `· ${sesion.producto}` : ""}
     </p>
   </div>
 
-  <EvaluacionForm
-    client:load
-    sesion={sesion}
-    alumnos={alumnos}
-    evaluacionesIniciales={evaluaciones}
-    curriculo={curriculo}
-    sesionId={Number(sesionId)}
-  />
+  <!-- Tabs -->
+  <div class="flex gap-2 mb-6" style="position: relative;">
+    <button
+      id="tab-asistencia"
+      data-tab="asistencia"
+      class="tab-btn text-sm px-4 py-2 rounded-lg bg-blue-600 text-white font-medium transition-colors cursor-pointer"
+    >
+      Asistencia
+    </button>
+    <button
+      id="tab-evaluacion"
+      data-tab="evaluacion"
+      class="tab-btn text-sm px-4 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
+    >
+      Evaluación
+    </button>
+  </div>
+
+  <!-- Panel: Asistencia -->
+  <div id="panel-asistencia">
+    <AsistenciaForm
+      client:load
+      {alumnos}
+      sesionId={Number(sesionId)}
+      asistenciasIniciales={asistencias}
+    />
+  </div>
+
+  <!-- Panel: Evaluación -->
+  <div id="panel-evaluacion" class="tab-panel--hidden">
+    <EvaluacionForm
+      client:load
+      {sesion}
+      {alumnos}
+      evaluacionesIniciales={evaluaciones}
+      {curriculo}
+      sesionId={Number(sesionId)}
+    />
+  </div>
 </Layout>
+
+<script>
+  const CLS_ACTIVE = ["bg-blue-600", "text-white", "font-medium"];
+  const CLS_INACTIVE = [
+    "border",
+    "border-gray-300",
+    "text-gray-600",
+    "hover:bg-gray-50",
+  ];
+
+  function activateTab(name: string) {
+    // Botones: siempre frescos
+    document.querySelectorAll<HTMLButtonElement>(".tab-btn").forEach((btn) => {
+      const isActive = btn.dataset.tab === name;
+      CLS_ACTIVE.forEach((c) => btn.classList.toggle(c, isActive));
+      CLS_INACTIVE.forEach((c) => btn.classList.toggle(c, !isActive));
+    });
+
+    // Paneles: siempre frescos, usando clases en vez de style inline
+    ["asistencia", "evaluacion"].forEach((key) => {
+      const el = document.getElementById(`panel-${key}`);
+      if (!el) return;
+      el.classList.toggle("tab-panel--hidden", key !== name);
+    });
+  }
+
+  document.addEventListener("click", (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>(
+      ".tab-btn",
+    );
+    if (!btn?.dataset.tab) return;
+    activateTab(btn.dataset.tab);
+  });
+</script>

@@ -1,11 +1,12 @@
 <script lang="ts">
-    import type { Sesion, SesionCriterio, Alumno, Evaluacion, Nota } from "../../lib/types";
+    import type { Sesion, SesionCriterio, Alumno, Evaluacion, Nota, EstadoAsistencia } from "../../lib/types";
 
     export let sesion: Sesion & { criterios: SesionCriterio[] };
     export let alumnos: Alumno[];
     export let evaluacionesIniciales: Evaluacion[] = [];
     export let curriculo: any = null;
     export let sesionId: number;
+    export let mapaAsistencia: Record<number, { estado: EstadoAsistencia; observacion: string | null }> = {};
 
     type Celda   = Nota | null;
     type NotaMap = Record<string, Celda>;
@@ -35,12 +36,14 @@
 
     let obsActiva: string | null = null;
 
-    $: criterios    = sesion.criterios ?? [];
-    $: hayAlumnos   = alumnos.length > 0;
-    $: hayCriterios = criterios.length > 0;
+    $: criterios         = sesion.criterios ?? [];
+    $: alumnosEvaluables = alumnos.filter(a => mapaAsistencia[a.id]?.estado !== 'F');
+    $: alumnosAusentes   = alumnos.filter(a => mapaAsistencia[a.id]?.estado === 'F');
+    $: hayAlumnos        = alumnosEvaluables.length > 0;
+    $: hayCriterios      = criterios.length > 0;
 
     $: celdasConNota = Object.values(notas).filter(Boolean).length;
-    $: totalCeldas   = alumnos.length * criterios.length;
+    $: totalCeldas   = alumnosEvaluables.length * criterios.length;
     $: porcentaje    = totalCeldas > 0 ? Math.round((celdasConNota / totalCeldas) * 100) : 0;
     $: hayCambios    = JSON.stringify(notas) !== JSON.stringify(notasGuardado)
                     || JSON.stringify(obs)   !== JSON.stringify(obsGuardado);
@@ -95,7 +98,7 @@
         error = ""; exito = "";
 
         const evaluaciones: { sesionCriterioId: number; alumnoId: number; nota: Nota | null; observacion?: string }[] = [];
-        for (const alumno of alumnos) {
+        for (const alumno of alumnosEvaluables) {
             for (const criterio of criterios) {
                 const key  = `${alumno.id}_${criterio.id}`;
                 const nota = notas[key] ?? null;
@@ -203,6 +206,20 @@
     Usa el ícono <span style="font-size:.8rem;">✏️</span> para agregar observaciones por criterio.
 </p>
 
+{#if alumnosAusentes.length > 0}
+    <div class="mb-4 flex items-start gap-2 px-3 py-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700">
+        <svg class="shrink-0 mt-0.5" width="13" height="13" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M8 5v4m0 2v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <span>
+            {alumnosAusentes.length === 1
+                ? `${alumnosAusentes[0].apellido}, ${alumnosAusentes[0].nombre} no aparece porque marcaste su asistencia como Falta.`
+                : `${alumnosAusentes.length} alumnos no aparecen porque su asistencia está marcada como Falta: ${alumnosAusentes.map(a => `${a.apellido}, ${a.nombre}`).join(' · ')}.`}
+        </span>
+    </div>
+{/if}
+
 {#if !hayAlumnos}
     <div class="text-center py-16 text-gray-400">
         <p class="text-sm">No hay alumnos activos en esta sección.</p>
@@ -267,7 +284,7 @@
             </thead>
 
             <tbody class="divide-y divide-gray-100">
-                {#each alumnos as alumno}
+                {#each alumnosEvaluables as alumno}
                     {@const tieneAlgunaNota = criterios.some((c) => notas[`${alumno.id}_${c.id}`] != null)}
 
                     <tr class="transition-colors group {tieneAlgunaNota ? '' : 'opacity-80'}">

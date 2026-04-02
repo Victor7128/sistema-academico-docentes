@@ -237,3 +237,23 @@ export interface OnboardingBody {
   cursoId: number;
   gradosIds: number[];
 }
+
+export type EstadoAsistencia = 'P' | 'F';
+
+export interface Asistencia {
+  id: number;
+  sesionId: number;
+  alumnoId: number;
+  estado: EstadoAsistencia;
+  observacion: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AsistenciaLoteBody {
+  asistencias: {
+    alumnoId: number;
+    estado: EstadoAsistencia;
+    observacion?: string | null;
+  }[];
+}

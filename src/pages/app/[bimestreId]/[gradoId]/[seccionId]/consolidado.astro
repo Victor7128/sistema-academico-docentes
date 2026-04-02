@@ -1,19 +1,27 @@
 ---
-import Layout from '../../../../../layouts/Layout.astro';
-import ConsolidadoForm from '../../../../../components/svelte/Consolidado.svelte';
-import { query } from '../../../../../lib/db';
-import { getCurriculoPorNombre } from '../../../../../lib/curriculo/index';
-import type { Bimestre, Grado, Seccion, Alumno, Sesion, SesionCriterio } from '../../../../../lib/types';
+import Layout from "../../../../../layouts/Layout.astro";
+import ConsolidadoForm from "../../../../../components/svelte/Consolidado.svelte";
+import ConsolidadoAsistencia from "../../../../../components/svelte/ConsolidadoAsistencia.svelte";
+import { query } from "../../../../../lib/db";
+import { getCurriculoPorNombre } from "../../../../../lib/curriculo/index";
+import type {
+  Bimestre,
+  Grado,
+  Seccion,
+  Alumno,
+  Sesion,
+  SesionCriterio,
+} from "../../../../../lib/types";
 
 const docente = Astro.locals.docente;
 const { bimestreId, gradoId, seccionId } = Astro.params;
-if (!bimestreId || !gradoId || !seccionId) return Astro.redirect('/');
+if (!bimestreId || !gradoId || !seccionId) return Astro.redirect("/");
 
 const [bimestre] = await query<Bimestre>`
   SELECT id, nombre, anio FROM bimestre
   WHERE id = ${bimestreId} AND docente_id = ${docente.id}
 `;
-if (!bimestre) return Astro.redirect('/');
+if (!bimestre) return Astro.redirect("/");
 
 const [grado] = await query<Grado>`
   SELECT g.id, g.nombre FROM grado g
@@ -28,18 +36,18 @@ const [seccion] = await query<Seccion>`
 `;
 if (!seccion) return Astro.redirect(`/app/${bimestreId}/${gradoId}`);
 
-// Alumnos activos
-const alumnos = await query<Alumno>`
-  SELECT id, orden, nombre, apellido
-  FROM alumno
-  WHERE seccion_id = ${seccionId} AND estado = 1
-  ORDER BY orden ASC, apellido ASC
-`;
-
-// Sesiones activas del bimestre con sus criterios
-const sesiones = await query<Sesion & { criterios: SesionCriterio[] }>`
+const [alumnos, sesiones, evaluaciones, consolidados, faltas] =
+  await Promise.all([
+    query<Alumno>`
+    SELECT id, orden, nombre, apellido
+    FROM alumno
+    WHERE seccion_id = ${seccionId} AND estado = 1
+    ORDER BY orden ASC, apellido ASC
+  `,
+    query<Sesion & { criterios: SesionCriterio[] }>`
   SELECT
-    s.id, s.titulo, s.fecha,
+    s.id, s.titulo,
+    TO_CHAR(s.fecha, 'YYYY-MM-DD') AS fecha,   -- ← castear a string
     COALESCE(
       json_agg(
         json_build_object(
@@ -59,51 +67,71 @@ const sesiones = await query<Sesion & { criterios: SesionCriterio[] }>`
     AND s.estado      = 1
   GROUP BY s.id
   ORDER BY s.fecha ASC
-`;
+`,
+    query<{
+      sesionCriterioId: number;
+      sesionId: number;
+      alumnoId: number;
+      nota: string;
+      observacion: string | null;
+    }>`
+    SELECT
+      e.sesion_criterio_id AS "sesionCriterioId",
+      sc.sesion_id         AS "sesionId",
+      e.alumno_id          AS "alumnoId",
+      e.nota,
+      e.observacion
+    FROM evaluacion e
+    JOIN sesion_criterio sc ON e.sesion_criterio_id = sc.id
+    JOIN sesion s           ON sc.sesion_id = s.id
+    JOIN alumno a           ON e.alumno_id  = a.id
+    WHERE s.bimestre_id  = ${bimestreId}
+      AND s.grado_id     = ${gradoId}
+      AND a.seccion_id   = ${seccionId}
+  `,
+    query<{ alumnoId: number; notaFinal: string }>`
+    SELECT co.alumno_id AS "alumnoId", co.nota_final AS "notaFinal"
+    FROM consolidado co
+    JOIN alumno a ON co.alumno_id = a.id
+    WHERE co.bimestre_id = ${bimestreId}
+      AND a.seccion_id   = ${seccionId}
+  `,
+    // Faltas registradas en sesiones de este bimestre/grado para esta sección
+    query<{ sesionId: number; alumnoId: number; observacion: string | null }>`
+    SELECT
+      as2.sesion_id  AS "sesionId",
+      as2.alumno_id  AS "alumnoId",
+      as2.observacion
+    FROM asistencia as2
+    JOIN alumno a  ON as2.alumno_id  = a.id
+    JOIN sesion s  ON as2.sesion_id  = s.id
+    WHERE a.seccion_id   = ${seccionId}
+      AND s.bimestre_id  = ${bimestreId}
+      AND s.grado_id     = ${gradoId}
+      AND as2.estado     = 'F'
+  `,
+  ]);
 
-// Evaluaciones de los alumnos de esta sección en este bimestre
-const evaluaciones = await query<{
-  sesionCriterioId: number;
-  sesionId: number;
-  alumnoId: number;
-  nota: string;
-  observacion: string | null;
-}>`
-  SELECT
-    e.sesion_criterio_id AS "sesionCriterioId",
-    sc.sesion_id         AS "sesionId",
-    e.alumno_id          AS "alumnoId",
-    e.nota,
-    e.observacion
-  FROM evaluacion e
-  JOIN sesion_criterio sc ON e.sesion_criterio_id = sc.id
-  JOIN sesion s           ON sc.sesion_id = s.id
-  JOIN alumno a           ON e.alumno_id  = a.id
-  WHERE s.bimestre_id  = ${bimestreId}
-    AND s.grado_id     = ${gradoId}
-    AND a.seccion_id   = ${seccionId}
-`;
-
-// Consolidados ya calculados
-const consolidados = await query<{ alumnoId: number; notaFinal: string }>`
-  SELECT co.alumno_id AS "alumnoId", co.nota_final AS "notaFinal"
-  FROM consolidado co
-  JOIN alumno a ON co.alumno_id = a.id
-  WHERE co.bimestre_id = ${bimestreId}
-    AND a.seccion_id   = ${seccionId}
-`;
-
-const curriculo = docente.cursoNombre ? getCurriculoPorNombre(docente.cursoNombre) : null;
+const curriculo = docente.cursoNombre
+  ? getCurriculoPorNombre(docente.cursoNombre)
+  : null;
 ---
 
 <Layout title={`Consolidado — Sección ${seccion.nombre}`}>
   <div class="mb-6">
     <nav class="flex items-center gap-1.5 text-xs text-gray-400 mb-3 flex-wrap">
-      <a href={`/app/${bimestreId}`} class="hover:text-gray-600 transition-colors">
-        {bimestre.nombre} {bimestre.anio}
+      <a
+        href={`/app/${bimestreId}`}
+        class="hover:text-gray-600 transition-colors"
+      >
+        {bimestre.nombre}
+        {bimestre.anio}
       </a>
       <span>›</span>
-      <a href={`/app/${bimestreId}/${gradoId}`} class="hover:text-gray-600 transition-colors">
+      <a
+        href={`/app/${bimestreId}/${gradoId}`}
+        class="hover:text-gray-600 transition-colors"
+      >
         {grado.nombre}
       </a>
       <span>›</span>
@@ -117,17 +145,80 @@ const curriculo = docente.cursoNombre ? getCurriculoPorNombre(docente.cursoNombr
     </p>
   </div>
 
-  <ConsolidadoForm
-    client:load
-    alumnos={alumnos}
-    sesiones={sesiones}
-    evaluaciones={evaluaciones}
-    consolidadosIniciales={consolidados}
-    curriculo={curriculo}
-    bimestreId={Number(bimestreId)}
-    seccionId={Number(seccionId)}
-    seccionNombre={seccion.nombre}
-    gradoNombre={grado.nombre}
-    bimestreNombre={`${bimestre.nombre} ${bimestre.anio}`}
-  />
+  <!-- Tabs -->
+  <div class="flex gap-2 mb-6" style="position: relative;">
+    <button
+      data-tab="notas"
+      class="tab-btn text-sm px-4 py-2 rounded-lg bg-blue-600 text-white font-medium transition-colors cursor-pointer"
+    >
+      Notas
+    </button>
+    <button
+      data-tab="asistencia"
+      class="tab-btn text-sm px-4 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
+    >
+      Asistencia
+    </button>
+  </div>
+
+  <!-- Panel: Notas -->
+  <div id="panel-notas">
+    <ConsolidadoForm
+      client:load
+      {alumnos}
+      {sesiones}
+      {evaluaciones}
+      consolidadosIniciales={consolidados}
+      {curriculo}
+      bimestreId={Number(bimestreId)}
+      seccionId={Number(seccionId)}
+      seccionNombre={seccion.nombre}
+      gradoNombre={grado.nombre}
+      bimestreNombre={`${bimestre.nombre} ${bimestre.anio}`}
+    />
+  </div>
+
+  <!-- Panel: Asistencia -->
+  <div id="panel-asistencia" style="display:none;">
+    <ConsolidadoAsistencia
+      client:load
+      {alumnos}
+      {sesiones}
+      {faltas}
+      {curriculo}
+    />
+  </div>
 </Layout>
+
+<script>
+  const tabs = document.querySelectorAll<HTMLButtonElement>(".tab-btn");
+  const panels: Record<string, HTMLElement | null> = {
+    notas: document.getElementById("panel-notas"),
+    asistencia: document.getElementById("panel-asistencia"),
+  };
+
+  const CLS_ACTIVE = ["bg-blue-600", "text-white", "font-medium"];
+  const CLS_INACTIVE = [
+    "border",
+    "border-gray-300",
+    "text-gray-600",
+    "hover:bg-gray-50",
+  ];
+
+  function activateTab(name: string) {
+    tabs.forEach((btn) => {
+      const isActive = btn.dataset.tab === name;
+      CLS_ACTIVE.forEach((c) => btn.classList.toggle(c, isActive));
+      CLS_INACTIVE.forEach((c) => btn.classList.toggle(c, !isActive));
+    });
+    Object.entries(panels).forEach(([key, el]) => {
+      if (!el) return;
+      el.style.display = key === name ? "" : "none";
+      el.style.pointerEvents = key === name ? "" : "none";
+    });
+  }
+
+  tabs.forEach((btn) => {
+    btn.addEventListener("click", () => activateTab(btn.dataset.tab!));
+  });
+</script>

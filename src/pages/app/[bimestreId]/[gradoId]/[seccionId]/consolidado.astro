@@ -1,7 +1,6 @@
 ---
 import Layout from "../../../../../layouts/Layout.astro";
-import ConsolidadoForm from "../../../../../components/svelte/Consolidado.svelte";
-import ConsolidadoAsistencia from "../../../../../components/svelte/ConsolidadoAsistencia.svelte";
+import ConsolidadoTabs from "../../../../../components/svelte/ConsolidadoTabs.svelte";
 import { query } from "../../../../../lib/db";
 import { getCurriculoPorNombre } from "../../../../../lib/curriculo/index";
 import type {
@@ -47,7 +46,7 @@ const [alumnos, sesiones, evaluaciones, consolidados, faltas] =
     query<Sesion & { criterios: SesionCriterio[] }>`
   SELECT
     s.id, s.titulo,
-    TO_CHAR(s.fecha, 'YYYY-MM-DD') AS fecha,   -- ← castear a string
+    TO_CHAR(s.fecha, 'YYYY-MM-DD') AS fecha,
     COALESCE(
       json_agg(
         json_build_object(
@@ -96,7 +95,6 @@ const [alumnos, sesiones, evaluaciones, consolidados, faltas] =
     WHERE co.bimestre_id = ${bimestreId}
       AND a.seccion_id   = ${seccionId}
   `,
-    // Faltas registradas en sesiones de este bimestre/grado para esta sección
     query<{ sesionId: number; alumnoId: number; observacion: string | null }>`
     SELECT
       as2.sesion_id  AS "sesionId",
@@ -145,80 +143,19 @@ const curriculo = docente.cursoNombre
     </p>
   </div>
 
-  <!-- Tabs -->
-  <div class="flex gap-2 mb-6" style="position: relative;">
-    <button
-      data-tab="notas"
-      class="tab-btn text-sm px-4 py-2 rounded-lg bg-blue-600 text-white font-medium transition-colors cursor-pointer"
-    >
-      Notas
-    </button>
-    <button
-      data-tab="asistencia"
-      class="tab-btn text-sm px-4 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
-    >
-      Asistencia
-    </button>
-  </div>
-
-  <!-- Panel: Notas -->
-  <div id="panel-notas">
-    <ConsolidadoForm
-      client:load
-      {alumnos}
-      {sesiones}
-      {evaluaciones}
-      consolidadosIniciales={consolidados}
-      {curriculo}
-      bimestreId={Number(bimestreId)}
-      seccionId={Number(seccionId)}
-      seccionNombre={seccion.nombre}
-      gradoNombre={grado.nombre}
-      bimestreNombre={`${bimestre.nombre} ${bimestre.anio}`}
-    />
-  </div>
-
-  <!-- Panel: Asistencia -->
-  <div id="panel-asistencia" style="display:none;">
-    <ConsolidadoAsistencia
-      client:load
-      {alumnos}
-      {sesiones}
-      {faltas}
-      {curriculo}
-    />
-  </div>
+  <!-- Un solo componente Svelte maneja los tabs y ambos paneles -->
+  <ConsolidadoTabs
+    client:load
+    {alumnos}
+    {sesiones}
+    {evaluaciones}
+    consolidadosIniciales={consolidados}
+    {faltas}
+    {curriculo}
+    bimestreId={Number(bimestreId)}
+    seccionId={Number(seccionId)}
+    seccionNombre={seccion.nombre}
+    gradoNombre={grado.nombre}
+    bimestreNombre={`${bimestre.nombre} ${bimestre.anio}`}
+  />
 </Layout>
-
-<script>
-  const tabs = document.querySelectorAll<HTMLButtonElement>(".tab-btn");
-  const panels: Record<string, HTMLElement | null> = {
-    notas: document.getElementById("panel-notas"),
-    asistencia: document.getElementById("panel-asistencia"),
-  };
-
-  const CLS_ACTIVE = ["bg-blue-600", "text-white", "font-medium"];
-  const CLS_INACTIVE = [
-    "border",
-    "border-gray-300",
-    "text-gray-600",
-    "hover:bg-gray-50",
-  ];
-
-  function activateTab(name: string) {
-    tabs.forEach((btn) => {
-      const isActive = btn.dataset.tab === name;
-      CLS_ACTIVE.forEach((c) => btn.classList.toggle(c, isActive));
-      CLS_INACTIVE.forEach((c) => btn.classList.toggle(c, !isActive));
-    });
-    Object.entries(panels).forEach(([key, el]) => {
-      if (!el) return;
-      el.style.display = key === name ? "" : "none";
-      el.style.pointerEvents = key === name ? "" : "none";
-    });
-  }
-
-  tabs.forEach((btn) => {
-    btn.addEventListener("click", () => activateTab(btn.dataset.tab!));
-  });
-</script>

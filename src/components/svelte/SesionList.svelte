@@ -319,21 +319,40 @@
     <span class="text-sm text-gray-500">
         {activas.length} sesión{activas.length !== 1 ? "es" : ""}
     </span>
-    <button
-        on:click={abrirCrear}
-        class="flex items-center gap-1.5 text-sm text-white bg-blue-600
-               hover:bg-blue-700 rounded-lg px-3 py-2 transition-colors cursor-pointer"
-    >
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-            <path
-                d="M8 2v12M2 8h12"
-                stroke="currentColor"
-                stroke-width="1.5"
-                stroke-linecap="round"
-            />
-        </svg>
-        Nueva sesión
-    </button>
+    <div class="flex items-center gap-2">
+        <a
+            href={`/app/${bimestreId}/${gradoId}/${seccionId}/examen-diagnostico`}
+            class="flex items-center gap-1.5 text-sm text-amber-700 bg-amber-50
+                   hover:bg-amber-100 border border-amber-200 rounded-lg px-3 py-2 transition-colors"
+        >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <path
+                    d="M3 2h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"
+                    stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                />
+                <path
+                    d="M5 6h6M5 9h4"
+                    stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                />
+            </svg>
+            Evaluación diagnóstica
+        </a>
+        <button
+            on:click={abrirCrear}
+            class="flex items-center gap-1.5 text-sm text-white bg-blue-600
+                   hover:bg-blue-700 rounded-lg px-3 py-2 transition-colors cursor-pointer"
+        >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <path
+                    d="M8 2v12M2 8h12"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linecap="round"
+                />
+            </svg>
+            Nueva sesión
+        </button>
+    </div>
 </div>
 
 {#if error && !modalAbierto}

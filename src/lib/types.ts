@@ -164,9 +164,14 @@ export interface ConsolidadoDetalle {
     criterio: string;
     nota: Nota;
   }[];
+  // NUEVO
+  examenConocimientos: {
+    competenciaId: string;
+    competenciaNombre: string;
+    nota: Nota | null;
+  }[];
   calculadoEn: string;
 }
-
 // ============================================================
 // TIPOS PARA VISTAS DE LA BD
 // ============================================================
@@ -254,6 +259,38 @@ export interface AsistenciaLoteBody {
   asistencias: {
     alumnoId: number;
     estado: EstadoAsistencia;
+    observacion?: string | null;
+  }[];
+}
+
+export type EstadoExamenNota = 'pendiente' | 'completado';
+
+export interface ExamenBimestre {
+  id: number;
+  bimestreId: number;
+  estado: 0 | 1;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExamenNota {
+  id: number;
+  examenBimestreId: number;
+  alumnoId: number;
+  competenciaId: string;
+  nota: Nota | null;          // null si aún no rindió
+  observacion: string | null;
+  estado: EstadoExamenNota;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Body para registrar/actualizar notas en lote (upsert)
+export interface ExamenNotaLoteBody {
+  notas: {
+    alumnoId: number;
+    competenciaId: string;
+    nota: Nota | null;        // null = guardar como pendiente
     observacion?: string | null;
   }[];
 }

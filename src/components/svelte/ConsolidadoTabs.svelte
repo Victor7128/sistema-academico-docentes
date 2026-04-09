@@ -3,7 +3,6 @@
     import ConsolidadoAsistencia from "./ConsolidadoAsistencia.svelte";
     import type { Alumno, Sesion, SesionCriterio } from "../../lib/types";
 
-    // ── Props que venían del .astro ──────────────────────────────────────────
     export let alumnos: Alumno[] = [];
     export let sesiones: (Sesion & { criterios: SesionCriterio[] })[] = [];
     export let evaluaciones: {
@@ -28,8 +27,9 @@
     export let seccionNombre: string = "";
     export let gradoNombre: string = "";
     export let bimestreNombre: string = "";
+    // NUEVO
+    export let examenNotas: { alumnoId: number; competenciaId: string; nota: string | null }[] = [];
 
-    // ── Estado del tab ───────────────────────────────────────────────────────
     type Tab = "notas" | "asistencia";
     let tabActivo: Tab = "notas";
 
@@ -47,21 +47,8 @@
         type="button"
     >
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-            <rect
-                x="1"
-                y="2"
-                width="14"
-                height="12"
-                rx="2"
-                stroke="currentColor"
-                stroke-width="1.4"
-            />
-            <path
-                d="M4 6h8M4 9h5M4 12h3"
-                stroke="currentColor"
-                stroke-width="1.3"
-                stroke-linecap="round"
-            />
+            <rect x="1" y="2" width="14" height="12" rx="2" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M4 6h8M4 9h5M4 12h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
         </svg>
         Notas
     </button>
@@ -72,28 +59,13 @@
         type="button"
     >
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-            <rect
-                x="1"
-                y="2"
-                width="14"
-                height="12"
-                rx="2"
-                stroke="currentColor"
-                stroke-width="1.4"
-            />
-            <path
-                d="M5 7l2 2 4-4"
-                stroke="currentColor"
-                stroke-width="1.4"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-            />
+            <rect x="1" y="2" width="14" height="12" rx="2" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M5 7l2 2 4-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
         Asistencia
     </button>
 </div>
 
-<!-- Paneles — sólo uno montado a la vez -->
 {#if tabActivo === "notas"}
     <ConsolidadoForm
         {alumnos}
@@ -106,6 +78,7 @@
         {seccionNombre}
         {gradoNombre}
         {bimestreNombre}
+        {examenNotas}
     />
 {:else}
     <ConsolidadoAsistencia {alumnos} {sesiones} {faltas} />
@@ -117,7 +90,6 @@
         gap: 0.5rem;
         margin-bottom: 1.5rem;
     }
-
     .tab-btn {
         display: inline-flex;
         align-items: center;
@@ -130,24 +102,18 @@
         background: transparent;
         color: #6b7280;
         cursor: pointer;
-        transition:
-            background 0.12s,
-            color 0.12s,
-            border-color 0.12s;
+        transition: background 0.12s, color 0.12s, border-color 0.12s;
     }
-
     .tab-btn:hover {
         background: #f9fafb;
         color: #374151;
     }
-
     .tab-btn--activo {
         background: #1d4ed8;
         color: #fff;
         border-color: #1d4ed8;
         font-weight: 600;
     }
-
     .tab-btn--activo:hover {
         background: #1e40af;
         color: #fff;

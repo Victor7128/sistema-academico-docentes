@@ -10,6 +10,7 @@ import type {
   Alumno,
   Sesion,
   SesionCriterio,
+  ExamenNota,
 } from "../../../../../lib/types";
 
 const docente = Astro.locals.docente;
@@ -35,38 +36,38 @@ const [seccion] = await query<Seccion>`
 `;
 if (!seccion) return Astro.redirect(`/app/${bimestreId}/${gradoId}`);
 
-const [alumnos, sesiones, evaluaciones, consolidados, faltas] =
+const [alumnos, sesiones, evaluaciones, consolidados, faltas, examenNotas] =
   await Promise.all([
     query<Alumno>`
-    SELECT id, orden, nombre, apellido
-    FROM alumno
-    WHERE seccion_id = ${seccionId} AND estado = 1
-    ORDER BY orden ASC, apellido ASC
-  `,
+      SELECT id, orden, nombre, apellido
+      FROM alumno
+      WHERE seccion_id = ${seccionId} AND estado = 1
+      ORDER BY orden ASC, apellido ASC
+    `,
     query<Sesion & { criterios: SesionCriterio[] }>`
-  SELECT
-    s.id, s.titulo,
-    TO_CHAR(s.fecha, 'YYYY-MM-DD') AS fecha,
-    COALESCE(
-      json_agg(
-        json_build_object(
-          'id',            sc.id,
-          'competenciaId', sc.competencia_id,
-          'capacidadId',   sc.capacidad_id,
-          'criterio',      sc.criterio,
-          'orden',         sc.orden
-        ) ORDER BY sc.orden
-      ) FILTER (WHERE sc.id IS NOT NULL),
-      '[]'
-    ) AS criterios
-  FROM sesion s
-  LEFT JOIN sesion_criterio sc ON sc.sesion_id = s.id
-  WHERE s.bimestre_id = ${bimestreId}
-    AND s.grado_id    = ${gradoId}
-    AND s.estado      = 1
-  GROUP BY s.id
-  ORDER BY s.fecha ASC
-`,
+      SELECT
+        s.id, s.titulo,
+        TO_CHAR(s.fecha, 'YYYY-MM-DD') AS fecha,
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'id',            sc.id,
+              'competenciaId', sc.competencia_id,
+              'capacidadId',   sc.capacidad_id,
+              'criterio',      sc.criterio,
+              'orden',         sc.orden
+            ) ORDER BY sc.orden
+          ) FILTER (WHERE sc.id IS NOT NULL),
+          '[]'
+        ) AS criterios
+      FROM sesion s
+      LEFT JOIN sesion_criterio sc ON sc.sesion_id = s.id
+      WHERE s.bimestre_id = ${bimestreId}
+        AND s.grado_id    = ${gradoId}
+        AND s.estado      = 1
+      GROUP BY s.id
+      ORDER BY s.fecha ASC
+    `,
     query<{
       sesionCriterioId: number;
       sesionId: number;
@@ -74,40 +75,53 @@ const [alumnos, sesiones, evaluaciones, consolidados, faltas] =
       nota: string;
       observacion: string | null;
     }>`
-    SELECT
-      e.sesion_criterio_id AS "sesionCriterioId",
-      sc.sesion_id         AS "sesionId",
-      e.alumno_id          AS "alumnoId",
-      e.nota,
-      e.observacion
-    FROM evaluacion e
-    JOIN sesion_criterio sc ON e.sesion_criterio_id = sc.id
-    JOIN sesion s           ON sc.sesion_id = s.id
-    JOIN alumno a           ON e.alumno_id  = a.id
-    WHERE s.bimestre_id  = ${bimestreId}
-      AND s.grado_id     = ${gradoId}
-      AND a.seccion_id   = ${seccionId}
-  `,
+      SELECT
+        e.sesion_criterio_id AS "sesionCriterioId",
+        sc.sesion_id         AS "sesionId",
+        e.alumno_id          AS "alumnoId",
+        e.nota,
+        e.observacion
+      FROM evaluacion e
+      JOIN sesion_criterio sc ON e.sesion_criterio_id = sc.id
+      JOIN sesion s           ON sc.sesion_id = s.id
+      JOIN alumno a           ON e.alumno_id  = a.id
+      WHERE s.bimestre_id  = ${bimestreId}
+        AND s.grado_id     = ${gradoId}
+        AND a.seccion_id   = ${seccionId}
+    `,
     query<{ alumnoId: number; notaFinal: string }>`
-    SELECT co.alumno_id AS "alumnoId", co.nota_final AS "notaFinal"
-    FROM consolidado co
-    JOIN alumno a ON co.alumno_id = a.id
-    WHERE co.bimestre_id = ${bimestreId}
-      AND a.seccion_id   = ${seccionId}
-  `,
+      SELECT co.alumno_id AS "alumnoId", co.nota_final AS "notaFinal"
+      FROM consolidado co
+      JOIN alumno a ON co.alumno_id = a.id
+      WHERE co.bimestre_id = ${bimestreId}
+        AND a.seccion_id   = ${seccionId}
+    `,
     query<{ sesionId: number; alumnoId: number; observacion: string | null }>`
-    SELECT
-      as2.sesion_id  AS "sesionId",
-      as2.alumno_id  AS "alumnoId",
-      as2.observacion
-    FROM asistencia as2
-    JOIN alumno a  ON as2.alumno_id  = a.id
-    JOIN sesion s  ON as2.sesion_id  = s.id
-    WHERE a.seccion_id   = ${seccionId}
-      AND s.bimestre_id  = ${bimestreId}
-      AND s.grado_id     = ${gradoId}
-      AND as2.estado     = 'F'
-  `,
+      SELECT
+        as2.sesion_id  AS "sesionId",
+        as2.alumno_id  AS "alumnoId",
+        as2.observacion
+      FROM asistencia as2
+      JOIN alumno a  ON as2.alumno_id  = a.id
+      JOIN sesion s  ON as2.sesion_id  = s.id
+      WHERE a.seccion_id   = ${seccionId}
+        AND s.bimestre_id  = ${bimestreId}
+        AND s.grado_id     = ${gradoId}
+        AND as2.estado     = 'F'
+    `,
+    // NUEVO: notas del examen diagnóstico para alumnos de esta sección
+    query<{ alumnoId: number; competenciaId: string; nota: string | null }>`
+      SELECT
+        en.alumno_id      AS "alumnoId",
+        en.competencia_id AS "competenciaId",
+        en.nota
+      FROM examen_nota en
+      JOIN examen_bimestre eb ON eb.id = en.examen_bimestre_id
+      JOIN alumno a           ON a.id  = en.alumno_id
+      WHERE eb.bimestre_id = ${bimestreId}
+        AND a.seccion_id   = ${seccionId}
+        AND en.nota IS NOT NULL
+    `,
   ]);
 
 const curriculo = docente.cursoNombre
@@ -118,18 +132,11 @@ const curriculo = docente.cursoNombre
 <Layout title={`Consolidado — Sección ${seccion.nombre}`}>
   <div class="mb-6">
     <nav class="flex items-center gap-1.5 text-xs text-gray-400 mb-3 flex-wrap">
-      <a
-        href={`/app/${bimestreId}`}
-        class="hover:text-gray-600 transition-colors"
-      >
-        {bimestre.nombre}
-        {bimestre.anio}
+      <a href={`/app/${bimestreId}`} class="hover:text-gray-600 transition-colors">
+        {bimestre.nombre} {bimestre.anio}
       </a>
       <span>›</span>
-      <a
-        href={`/app/${bimestreId}/${gradoId}`}
-        class="hover:text-gray-600 transition-colors"
-      >
+      <a href={`/app/${bimestreId}/${gradoId}`} class="hover:text-gray-600 transition-colors">
         {grado.nombre}
       </a>
       <span>›</span>
@@ -143,7 +150,6 @@ const curriculo = docente.cursoNombre
     </p>
   </div>
 
-  <!-- Un solo componente Svelte maneja los tabs y ambos paneles -->
   <ConsolidadoTabs
     client:load
     {alumnos}
@@ -152,6 +158,7 @@ const curriculo = docente.cursoNombre
     consolidadosIniciales={consolidados}
     {faltas}
     {curriculo}
+    {examenNotas}
     bimestreId={Number(bimestreId)}
     seccionId={Number(seccionId)}
     seccionNombre={seccion.nombre}

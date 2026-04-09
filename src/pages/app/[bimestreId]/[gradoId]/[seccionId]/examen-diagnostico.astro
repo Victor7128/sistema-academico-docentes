@@ -1,0 +1,137 @@
+---
+import Layout from '../../../../../layouts/Layout.astro';
+import ExamenDiagnosticoForm from '../../../../../components/svelte/ExamenDiagnosticoForm.svelte';
+import { query } from '../../../../../lib/db';
+import { getCurriculoPorNombre } from '../../../../../lib/curriculo/index';
+import type { Bimestre, Grado, Seccion, Alumno, ExamenBimestre, ExamenNota } from '../../../../../lib/types';
+
+const docente = Astro.locals.docente;
+const { bimestreId, gradoId, seccionId } = Astro.params;
+if (!bimestreId || !gradoId || !seccionId) return Astro.redirect('/');
+
+const [bimestre] = await query<Bimestre>`
+  SELECT id, nombre, anio FROM bimestre
+  WHERE id = ${bimestreId} AND docente_id = ${docente.id}
+`;
+if (!bimestre) return Astro.redirect('/');
+
+const [grado] = await query<Grado>`
+  SELECT g.id, g.nombre FROM grado g
+  JOIN docente_grado dg ON dg.grado_id = g.id
+  WHERE g.id = ${gradoId} AND dg.docente_id = ${docente.id} AND g.estado = 1
+`;
+if (!grado) return Astro.redirect(`/app/${bimestreId}`);
+
+const [seccion] = await query<Seccion>`
+  SELECT id, nombre FROM seccion
+  WHERE id = ${seccionId} AND grado_id = ${gradoId} AND estado = 1
+`;
+if (!seccion) return Astro.redirect(`/app/${bimestreId}/${gradoId}`);
+
+// Cargar alumnos y examen en paralelo
+const [alumnos, examenRows] = await Promise.all([
+  query<Alumno>`
+    SELECT id, nombre, apellido, orden
+    FROM alumno
+    WHERE seccion_id = ${seccionId} AND estado = 1
+    ORDER BY orden ASC, apellido ASC, nombre ASC
+  `,
+  query<ExamenBimestre>`
+    SELECT id, bimestre_id AS "bimestreId", estado
+    FROM examen_bimestre
+    WHERE bimestre_id = ${bimestreId}
+  `,
+]);
+
+// Si no existe el examen todavía lo creamos automáticamente
+let examen: ExamenBimestre;
+const [examenExistente] = examenRows;
+
+if (examenExistente) {
+  examen = examenExistente;
+} else {
+  const [creado] = await query<ExamenBimestre>`
+    INSERT INTO examen_bimestre (bimestre_id)
+    VALUES (${bimestreId}::bigint)
+    RETURNING id, bimestre_id AS "bimestreId", estado
+  `;
+  examen = creado;
+}
+
+// Notas ya guardadas para este examen en alumnos de esta sección
+const notasIniciales = await query<ExamenNota>`
+  SELECT
+    en.id,
+    en.examen_bimestre_id AS "examenBimestreId",
+    en.alumno_id          AS "alumnoId",
+    en.competencia_id     AS "competenciaId",
+    en.nota,
+    en.observacion,
+    en.estado,
+    en.created_at         AS "createdAt",
+    en.updated_at         AS "updatedAt"
+  FROM examen_nota en
+  JOIN alumno a ON a.id = en.alumno_id
+  WHERE en.examen_bimestre_id = ${examen.id}
+    AND a.seccion_id = ${seccionId}
+`;
+
+const curriculo = docente.cursoNombre ? getCurriculoPorNombre(docente.cursoNombre) : null;
+---
+
+<Layout title={`Evaluación diagnóstica — Sección ${seccion.nombre}`}>
+  <style>
+    .ph { font-family: 'DM Serif Display', serif; font-size: clamp(1.35rem, 3vw, 1.7rem); color: #1A2332; line-height: 1.15; }
+    .pm { font-size: .78rem; color: #8A96AA; margin-top: .2rem; }
+    .pbc { display: flex; align-items: center; gap: .3rem; font-size: .72rem; flex-wrap: wrap; margin-bottom: .6rem; }
+    .pbc a { color: #8A96AA; text-decoration: none; transition: color .15s; }
+    .pbc a:hover { color: #1B3A6B; }
+    .pbc-sep { color: #C8D3E8; }
+    .pbc-cur { color: #4A5672; font-weight: 500; }
+    .badge-diagnostico {
+      display: inline-flex; align-items: center; gap: .35rem;
+      font-size: .72rem; font-weight: 500;
+      color: #92400E; background: #FEF3E2;
+      border: 1px solid #FCD98A;
+      border-radius: 6px; padding: .2rem .55rem;
+      margin-left: .5rem; vertical-align: middle;
+    }
+  </style>
+
+  <div style="margin-bottom:1.5rem;">
+    <nav class="pbc">
+      <a href={`/app/${bimestreId}`}>{bimestre.nombre} {bimestre.anio}</a>
+      <span class="pbc-sep">›</span>
+      <a href={`/app/${bimestreId}/${gradoId}`}>{grado.nombre}</a>
+      <span class="pbc-sep">›</span>
+      <a href={`/app/${bimestreId}/${gradoId}/${seccionId}`}>Sección {seccion.nombre}</a>
+      <span class="pbc-sep">›</span>
+      <a href={`/app/${bimestreId}/${gradoId}/${seccionId}/sesiones`}>Sesiones</a>
+      <span class="pbc-sep">›</span>
+      <span class="pbc-cur">Evaluación diagnóstica</span>
+    </nav>
+    <h1 class="ph">
+      Evaluación diagnóstica
+      <span style="font-style:italic;color:#C8882A;">· Sección {seccion.nombre}</span>
+    </h1>
+    <p class="pm">
+      {grado.nombre} · {bimestre.nombre} {bimestre.anio}
+      <span class="badge-diagnostico">
+        <svg width="10" height="10" viewBox="0 0 16 16" fill="none">
+          <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M8 5v4m0 2v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        Una nota por competencia
+      </span>
+    </p>
+  </div>
+
+  <ExamenDiagnosticoForm
+    client:load
+    {alumnos}
+    {notasIniciales}
+    {curriculo}
+    examenBimestreId={examen.id}
+    bimestreId={Number(bimestreId)}
+  />
+</Layout>

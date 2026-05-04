@@ -115,7 +115,7 @@ const cursos = await sql<{
       </div>
 
       <OnboardingForm
-        client:load
+        client:only="svelte"
         cursos={cursos}
         googleProfile={googleProfile}
       />

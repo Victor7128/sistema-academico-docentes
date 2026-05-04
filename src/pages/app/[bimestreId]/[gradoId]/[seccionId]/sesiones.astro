@@ -80,7 +80,7 @@ const curriculo = docente.cursoNombre ? getCurriculoPorNombre(docente.cursoNombr
   </div>
 
   <SesionList
-    client:load
+    client:only="svelte"
     sesiones={sesiones}
     curriculo={curriculo}
     bimestreId={Number(bimestreId)}

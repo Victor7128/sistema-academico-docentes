@@ -127,7 +127,7 @@ const curriculo = docente.cursoNombre ? getCurriculoPorNombre(docente.cursoNombr
   </div>
 
   <ExamenDiagnosticoForm
-    client:load
+    client:only="svelte"
     {alumnos}
     {notasIniciales}
     {curriculo}

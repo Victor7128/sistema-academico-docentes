@@ -45,7 +45,7 @@ const secciones = await query<Seccion & { totalAlumnos: number }>`
   </div>
 
   <SeccionCRUD
-    client:load
+    client:only="svelte"
     secciones={secciones}
     gradoId={Number(gradoId)}
     bimestreId={Number(bimestreId)}

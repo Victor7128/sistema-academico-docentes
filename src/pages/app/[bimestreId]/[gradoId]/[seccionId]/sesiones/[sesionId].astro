@@ -184,7 +184,7 @@ const curriculo = getCurriculoPorNombre(docente.cursoNombre ?? "") ?? null;
   <!-- Panel: Asistencia -->
   <div id="panel-asistencia">
     <AsistenciaForm
-      client:load
+      client:only="svelte"
       {alumnos}
       sesionId={Number(sesionId)}
       asistenciasIniciales={asistencias}
@@ -194,7 +194,7 @@ const curriculo = getCurriculoPorNombre(docente.cursoNombre ?? "") ?? null;
   <!-- Panel: Evaluación -->
   <div id="panel-evaluacion" class="tab-panel--hidden">
     <EvaluacionForm
-      client:load
+      client:only="svelte"
       {sesion}
       {alumnos}
       evaluacionesIniciales={evaluaciones}

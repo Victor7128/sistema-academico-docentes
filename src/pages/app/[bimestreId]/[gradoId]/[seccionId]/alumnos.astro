@@ -86,7 +86,7 @@ const seccionesOrigen = await query<{
   </div>
 
   <AlumnosCRUD
-    client:load
+    client:only="svelte"
     alumnos={alumnos}
     seccionId={Number(seccionId)}
     seccionesOrigen={seccionesOrigen}

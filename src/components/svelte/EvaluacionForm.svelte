@@ -1,56 +1,87 @@
 <script lang="ts">
-    import type { Sesion, SesionCriterio, Alumno, Evaluacion, Nota, EstadoAsistencia } from "../../lib/types";
+    import type {
+        Sesion,
+        SesionCriterio,
+        Alumno,
+        Evaluacion,
+        Nota,
+        EstadoAsistencia,
+    } from "../../lib/types";
 
     export let sesion: Sesion & { criterios: SesionCriterio[] };
     export let alumnos: Alumno[];
     export let evaluacionesIniciales: Evaluacion[] = [];
     export let curriculo: any = null;
     export let sesionId: number;
-    export let mapaAsistencia: Record<number, { estado: EstadoAsistencia; observacion: string | null }> = {};
+    export let mapaAsistencia: Record<
+        number,
+        { estado: EstadoAsistencia; observacion: string | null }
+    > = {};
 
-    type Celda   = Nota | null;
+    type Celda = Nota | null;
     type NotaMap = Record<string, Celda>;
-    type ObsMap  = Record<string, string>;
+    type ObsMap = Record<string, string>;
 
     const NOTAS: Nota[] = ["AD", "A", "B", "C"];
 
     let guardando = false;
-    let error     = "";
-    let exito     = "";
+    let error = "";
+    let exito = "";
 
     function buildNotaMap(evs: Evaluacion[]): NotaMap {
         const m: NotaMap = {};
-        for (const ev of evs) m[`${ev.alumnoId}_${ev.sesionCriterioId}`] = ev.nota;
+        for (const ev of evs)
+            m[`${ev.alumnoId}_${ev.sesionCriterioId}`] = ev.nota;
         return m;
     }
     function buildObsMap(evs: Evaluacion[]): ObsMap {
         const m: ObsMap = {};
-        for (const ev of evs) if (ev.observacion) m[`${ev.alumnoId}_${ev.sesionCriterioId}`] = ev.observacion;
+        for (const ev of evs)
+            if (ev.observacion)
+                m[`${ev.alumnoId}_${ev.sesionCriterioId}`] = ev.observacion;
         return m;
     }
 
-    let notas:         NotaMap = buildNotaMap(evaluacionesIniciales);
+    let notas: NotaMap = buildNotaMap(evaluacionesIniciales);
     let notasGuardado: NotaMap = buildNotaMap(evaluacionesIniciales);
-    let obs:           ObsMap  = buildObsMap(evaluacionesIniciales);
-    let obsGuardado:   ObsMap  = buildObsMap(evaluacionesIniciales);
+    let obs: ObsMap = buildObsMap(evaluacionesIniciales);
+    let obsGuardado: ObsMap = buildObsMap(evaluacionesIniciales);
 
     let obsActiva: string | null = null;
+    let autoGuardadoTimer: ReturnType<typeof setTimeout> | null = null;
 
-    $: criterios         = sesion.criterios ?? [];
-    $: alumnosEvaluables = alumnos.filter(a => mapaAsistencia[a.id]?.estado !== 'F');
-    $: alumnosAusentes   = alumnos.filter(a => mapaAsistencia[a.id]?.estado === 'F');
-    $: hayAlumnos        = alumnosEvaluables.length > 0;
-    $: hayCriterios      = criterios.length > 0;
+    $: criterios = sesion.criterios ?? [];
+    $: alumnosEvaluables = alumnos.filter(
+        (a) => mapaAsistencia[a.id]?.estado !== "F",
+    );
+    $: alumnosAusentes = alumnos.filter(
+        (a) => mapaAsistencia[a.id]?.estado === "F",
+    );
+    $: hayAlumnos = alumnosEvaluables.length > 0;
+    $: hayCriterios = criterios.length > 0;
 
     $: celdasConNota = Object.values(notas).filter(Boolean).length;
-    $: totalCeldas   = alumnosEvaluables.length * criterios.length;
-    $: porcentaje    = totalCeldas > 0 ? Math.round((celdasConNota / totalCeldas) * 100) : 0;
-    $: hayCambios    = JSON.stringify(notas) !== JSON.stringify(notasGuardado)
-                    || JSON.stringify(obs)   !== JSON.stringify(obsGuardado);
+    $: totalCeldas = alumnosEvaluables.length * criterios.length;
+    $: porcentaje =
+        totalCeldas > 0 ? Math.round((celdasConNota / totalCeldas) * 100) : 0;
+    $: hayCambios =
+        JSON.stringify(notas) !== JSON.stringify(notasGuardado) ||
+        JSON.stringify(obs) !== JSON.stringify(obsGuardado);
+
+    $: if (hayCambios) {
+        if (autoGuardadoTimer) clearTimeout(autoGuardadoTimer);
+        autoGuardadoTimer = setTimeout(() => {
+            if (hayCambios && !guardando) guardar();
+        }, 4000);
+    }
 
     type HeaderGroup = { id: string; nombre: string; colspan: number };
 
-    function runs(criterios: SesionCriterio[], keyFn: (c: SesionCriterio) => string, nameFn: (id: string) => string): HeaderGroup[] {
+    function runs(
+        criterios: SesionCriterio[],
+        keyFn: (c: SesionCriterio) => string,
+        nameFn: (id: string) => string,
+    ): HeaderGroup[] {
         const groups: HeaderGroup[] = [];
         for (const c of criterios) {
             const id = keyFn(c);
@@ -62,7 +93,10 @@
     }
 
     function nombreCompetencia(id: string): string {
-        return curriculo?.competencias?.find((c: any) => String(c.id) === id)?.nombre ?? id;
+        return (
+            curriculo?.competencias?.find((c: any) => String(c.id) === id)
+                ?.nombre ?? id
+        );
     }
     function nombreCapacidad(id: string): string {
         for (const comp of curriculo?.competencias ?? []) {
@@ -72,21 +106,31 @@
         return id;
     }
 
-    $: gruposCompetencia = runs(criterios, (c) => String(c.competenciaId), nombreCompetencia);
-    $: gruposCapacidad   = runs(criterios, (c) => String(c.capacidadId),   nombreCapacidad);
+    $: gruposCompetencia = runs(
+        criterios,
+        (c) => String(c.competenciaId),
+        nombreCompetencia,
+    );
+    $: gruposCapacidad = runs(
+        criterios,
+        (c) => String(c.capacidadId),
+        nombreCapacidad,
+    );
 
     function setNota(alumnoId: number, criterioId: number, nota: Nota) {
-        const key  = `${alumnoId}_${criterioId}`;
+        const key = `${alumnoId}_${criterioId}`;
         notas[key] = notas[key] === nota ? null : nota;
-        notas      = { ...notas };
-        error = ""; exito = "";
+        notas = { ...notas };
+        error = "";
+        exito = "";
     }
 
     function setObs(key: string, valor: string) {
         if (valor.trim()) obs[key] = valor;
         else delete obs[key];
-        obs   = { ...obs };
-        error = ""; exito = "";
+        obs = { ...obs };
+        error = "";
+        exito = "";
     }
 
     function toggleObs(key: string) {
@@ -94,42 +138,55 @@
     }
 
     async function guardar() {
+        if (autoGuardadoTimer) {
+            clearTimeout(autoGuardadoTimer);
+            autoGuardadoTimer = null;
+        } // ← agrega esto
         guardando = true;
-        error = ""; exito = "";
+        error = "";
+        exito = "";
 
-        const evaluaciones: { sesionCriterioId: number; alumnoId: number; nota: Nota | null; observacion?: string }[] = [];
+        const evaluaciones: {
+            sesionCriterioId: number;
+            alumnoId: number;
+            nota: Nota | null;
+            observacion?: string;
+        }[] = [];
         for (const alumno of alumnosEvaluables) {
             for (const criterio of criterios) {
-                const key  = `${alumno.id}_${criterio.id}`;
+                const key = `${alumno.id}_${criterio.id}`;
                 const nota = notas[key] ?? null;
                 if (nota) {
                     evaluaciones.push({
                         sesionCriterioId: criterio.id,
-                        alumnoId:         alumno.id,
+                        alumnoId: alumno.id,
                         nota,
                         ...(obs[key] ? { observacion: obs[key] } : {}),
                     });
                 } else if (obs[key]) {
                     evaluaciones.push({
                         sesionCriterioId: criterio.id,
-                        alumnoId:         alumno.id,
-                        nota:             null,
-                        observacion:      obs[key],
+                        alumnoId: alumno.id,
+                        nota: null,
+                        observacion: obs[key],
                     });
                 }
             }
         }
 
         try {
-            const res  = await fetch(`/api/evaluaciones/${sesionId}`, {
-                method:  "POST",
+            const res = await fetch(`/api/evaluaciones/${sesionId}`, {
+                method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body:    JSON.stringify({ evaluaciones }),
+                body: JSON.stringify({ evaluaciones }),
             });
             const json = await res.json();
-            if (!res.ok) { error = json.error ?? "Error al guardar."; return; }
+            if (!res.ok) {
+                error = json.error ?? "Error al guardar.";
+                return;
+            }
             notasGuardado = { ...notas };
-            obsGuardado   = { ...obs };
+            obsGuardado = { ...obs };
             exito = `${json.data.guardados} evaluación${json.data.guardados !== 1 ? "es" : ""} guardada${json.data.guardados !== 1 ? "s" : ""}.`;
         } catch {
             error = "No se pudo conectar con el servidor.";
@@ -139,11 +196,22 @@
     }
 
     function notaColor(nota: Nota, sel: boolean): string {
-        if (!sel) return "bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600";
-        return { AD: "bg-indigo-600 text-white", A: "bg-green-600 text-white", B: "bg-amber-500 text-white", C: "bg-red-600 text-white" }[nota];
+        if (!sel)
+            return "bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600";
+        return {
+            AD: "bg-indigo-600 text-white",
+            A: "bg-green-600 text-white",
+            B: "bg-amber-500 text-white",
+            C: "bg-red-600 text-white",
+        }[nota];
     }
     function notaDot(nota: Nota): string {
-        return { AD: "bg-indigo-500", A: "bg-green-500", B: "bg-amber-400", C: "bg-red-500" }[nota];
+        return {
+            AD: "bg-indigo-500",
+            A: "bg-green-500",
+            B: "bg-amber-400",
+            C: "bg-red-500",
+        }[nota];
     }
 </script>
 
@@ -152,10 +220,17 @@
         <div>
             <p class="text-sm font-medium text-gray-800">
                 {celdasConNota} / {totalCeldas}
-                <span class="text-gray-400 font-normal">evaluaciones registradas</span>
+                <span class="text-gray-400 font-normal"
+                    >evaluaciones registradas</span
+                >
             </p>
-            <div class="mt-1 h-1.5 w-48 bg-gray-100 rounded-full overflow-hidden">
-                <div class="h-full bg-blue-500 rounded-full transition-all duration-300" style="width: {porcentaje}%"></div>
+            <div
+                class="mt-1 h-1.5 w-48 bg-gray-100 rounded-full overflow-hidden"
+            >
+                <div
+                    class="h-full bg-blue-500 rounded-full transition-all duration-300"
+                    style="width: {porcentaje}%"
+                ></div>
             </div>
         </div>
         <span class="text-xs text-gray-400">{porcentaje}%</span>
@@ -164,8 +239,9 @@
     <div class="flex items-center gap-3">
         {#if hayCambios}
             <span class="text-xs text-amber-600 flex items-center gap-1">
-                <span class="inline-block w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                Cambios sin guardar
+                <span class="inline-block w-1.5 h-1.5 rounded-full bg-amber-500"
+                ></span>
+                {guardando ? "Guardando..." : "Guardando en unos segundos..."}
             </span>
         {/if}
         <button
@@ -182,17 +258,26 @@
 </div>
 
 {#if error}
-    <p class="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
+    <p
+        class="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2"
+    >
+        {error}
+    </p>
 {/if}
 {#if exito}
-    <p class="mb-4 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">{exito}</p>
+    <p
+        class="mb-4 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2"
+    >
+        {exito}
+    </p>
 {/if}
 
 <div class="flex items-center gap-3 mb-1 flex-wrap">
     <span class="text-xs text-gray-400">Notas:</span>
     {#each NOTAS as nota}
         <span class="flex items-center gap-1 text-xs text-gray-600">
-            <span class="inline-block w-2 h-2 rounded-full {notaDot(nota)}"></span>
+            <span class="inline-block w-2 h-2 rounded-full {notaDot(nota)}"
+            ></span>
             {nota} —
             {#if nota === "AD"}Logro destacado
             {:else if nota === "A"}Logro esperado
@@ -202,20 +287,40 @@
     {/each}
 </div>
 <p class="text-xs text-gray-400 mb-4">
-    Las notas son opcionales. Si un alumno faltó, deja la celda vacía.
-    Usa el ícono <span style="font-size:.8rem;">✏️</span> para agregar observaciones por criterio.
+    Las notas son opcionales. Si un alumno faltó, deja la celda vacía. Usa el
+    ícono <span style="font-size:.8rem;">✏️</span> para agregar observaciones por
+    criterio.
 </p>
 
 {#if alumnosAusentes.length > 0}
-    <div class="mb-4 flex items-start gap-2 px-3 py-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700">
-        <svg class="shrink-0 mt-0.5" width="13" height="13" viewBox="0 0 16 16" fill="none">
-            <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/>
-            <path d="M8 5v4m0 2v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    <div
+        class="mb-4 flex items-start gap-2 px-3 py-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700"
+    >
+        <svg
+            class="shrink-0 mt-0.5"
+            width="13"
+            height="13"
+            viewBox="0 0 16 16"
+            fill="none"
+        >
+            <circle
+                cx="8"
+                cy="8"
+                r="6"
+                stroke="currentColor"
+                stroke-width="1.5"
+            />
+            <path
+                d="M8 5v4m0 2v.5"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+            />
         </svg>
         <span>
             {alumnosAusentes.length === 1
                 ? `${alumnosAusentes[0].apellido}, ${alumnosAusentes[0].nombre} no aparece porque marcaste su asistencia como Falta.`
-                : `${alumnosAusentes.length} alumnos no aparecen porque su asistencia está marcada como Falta: ${alumnosAusentes.map(a => `${a.apellido}, ${a.nombre}`).join(' · ')}.`}
+                : `${alumnosAusentes.length} alumnos no aparecen porque su asistencia está marcada como Falta: ${alumnosAusentes.map((a) => `${a.apellido}, ${a.nombre}`).join(" · ")}.`}
         </span>
     </div>
 {/if}
@@ -229,14 +334,17 @@
         <p class="text-sm">Esta sesión no tiene criterios de evaluación.</p>
     </div>
 {:else}
-    <div class="overflow-x-auto rounded-xl border border-gray-200">
+    <div
+        class="overflow-auto rounded-xl border border-gray-200"
+        style="max-height: calc(100vh - 13rem)"
+    >
         <table class="w-full border-collapse text-sm">
-            <thead>
+            <thead class="sticky top-0 z-20">
                 <tr class="border-b border-gray-200">
                     <th
                         rowspan="3"
                         class="col-nombre text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase
-                               tracking-wider sticky left-0 bg-gray-50 z-10 border-r border-gray-200 align-bottom"
+                               tracking-wider sticky left-0 bg-gray-50 z-30 border-r border-gray-200 align-bottom"
                     >
                         Alumno
                     </th>
@@ -244,9 +352,13 @@
                         <th
                             colspan={grupo.colspan}
                             class="px-3 py-2 text-center text-xs font-semibold text-indigo-700 bg-indigo-50
-                                   {i < gruposCompetencia.length - 1 ? 'border-r border-indigo-200' : ''}"
+                                   {i < gruposCompetencia.length - 1
+                                ? 'border-r border-indigo-200'
+                                : ''}"
                         >
-                            <span class="line-clamp-2 leading-tight">{grupo.nombre}</span>
+                            <span class="line-clamp-2 leading-tight"
+                                >{grupo.nombre}</span
+                            >
                         </th>
                     {/each}
                 </tr>
@@ -255,20 +367,28 @@
                         <th
                             colspan={grupo.colspan}
                             class="px-3 py-2 text-center text-[11px] font-medium text-blue-700 bg-blue-50
-                                   {i < gruposCapacidad.length - 1 ? 'border-r border-blue-200' : ''}"
+                                   {i < gruposCapacidad.length - 1
+                                ? 'border-r border-blue-200'
+                                : ''}"
                         >
-                            <span class="line-clamp-2 leading-tight">{grupo.nombre}</span>
+                            <span class="line-clamp-2 leading-tight"
+                                >{grupo.nombre}</span
+                            >
                         </th>
                     {/each}
                 </tr>
-                <tr class="bg-gray-50 border-b border-gray-200">
+                <tr class="bg-gray-50 border-b border-gray-200 sticky top-0">
                     {#each criterios as criterio, idx}
                         <th
-                            class="px-3 py-2.5 text-center min-w-40
-                                   {idx < criterios.length - 1 ? 'border-r border-gray-200' : ''}"
+                            class="px-3 py-2.5 text-center min-w-28
+                                   {idx < criterios.length - 1
+                                ? 'border-r border-gray-200'
+                                : ''}"
                         >
                             <div class="flex flex-col items-center gap-0.5">
-                                <span class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+                                <span
+                                    class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider"
+                                >
                                     Criterio {idx + 1}
                                 </span>
                                 <span
@@ -285,63 +405,118 @@
 
             <tbody class="divide-y divide-gray-100">
                 {#each alumnosEvaluables as alumno}
-                    {@const tieneAlgunaNota = criterios.some((c) => notas[`${alumno.id}_${c.id}`] != null)}
+                    {@const tieneAlgunaNota = criterios.some(
+                        (c) => notas[`${alumno.id}_${c.id}`] != null,
+                    )}
 
-                    <tr class="transition-colors group {tieneAlgunaNota ? '' : 'opacity-80'}">
-                        <td class="col-nombre px-2 py-2.5 sticky left-0 z-10 border-r border-gray-200 bg-white
-                                   group-hover:bg-gray-50/60 transition-colors">
+                    <tr
+                        class="transition-colors group {tieneAlgunaNota
+                            ? ''
+                            : 'opacity-80'}"
+                    >
+                        <td
+                            class="col-nombre px-2 py-2.5 sticky left-0 z-10 border-r border-gray-200 bg-white
+                                   group-hover:bg-gray-50/60 transition-colors"
+                        >
                             <div class="flex items-center gap-1.5">
-                                <span class="shrink-0 w-1.5 h-1.5 rounded-full {tieneAlgunaNota ? 'bg-blue-400' : 'bg-gray-200'}"></span>
-                                <span class="nombre-alumno text-sm text-gray-900 font-medium">
+                                <span
+                                    class="shrink-0 w-1.5 h-1.5 rounded-full {tieneAlgunaNota
+                                        ? 'bg-blue-400'
+                                        : 'bg-gray-200'}"
+                                ></span>
+                                <span
+                                    class="nombre-alumno text-sm text-gray-900 font-medium"
+                                >
                                     {alumno.apellido}, {alumno.nombre}
                                 </span>
                             </div>
                         </td>
 
                         {#each criterios as criterio, critIdx}
-                            {@const key        = `${alumno.id}_${criterio.id}`}
+                            {@const key = `${alumno.id}_${criterio.id}`}
                             {@const notaActual = notas[key] ?? null}
                             {@const obsAbierta = obsActiva === key}
-                            {@const tieneObs   = !!obs[key]}
+                            {@const tieneObs = !!obs[key]}
 
-                            <td class="px-2 py-1.5 text-center align-top
-                                       {critIdx < criterios.length - 1 ? 'border-r border-gray-100' : ''}">
-
-                                <div class="flex items-center justify-center gap-0.5 mb-1">
-                                    {#each NOTAS as nota}
-                                        <button
-                                            type="button"
-                                            on:click={() => setNota(alumno.id, criterio.id, nota)}
-                                            title="{nota}: {nota === 'AD' ? 'Logro destacado' : nota === 'A' ? 'Logro esperado' : nota === 'B' ? 'En proceso' : 'En inicio'}"
-                                            class="w-8 h-7 text-xs font-semibold rounded transition-all cursor-pointer
-                                                   {notaColor(nota, notaActual === nota)}"
+                            <td
+                                class="px-2 py-1.5 text-center align-top
+                                       {critIdx < criterios.length - 1
+                                    ? 'border-r border-gray-100'
+                                    : ''}"
+                            >
+                                <div
+                                    class="flex items-center justify-center gap-1 mb-1"
+                                >
+                                    <div class="nota-wrapper">
+                                        {#if notaActual}
+                                            <span
+                                                class="nota-dot nota-dot--{notaActual}"
+                                            ></span>
+                                        {/if}
+                                        <select
+                                            value={notaActual ?? ""}
+                                            on:change={(e) => {
+                                                const v = e.currentTarget.value;
+                                                if (v === "") {
+                                                    notas[key] = null;
+                                                    notas = { ...notas };
+                                                } else {
+                                                    notas[key] = v as Nota;
+                                                    notas = { ...notas };
+                                                }
+                                                error = "";
+                                                exito = "";
+                                            }}
+                                            class="nota-select"
                                         >
-                                            {nota}
-                                        </button>
-                                    {/each}
+                                            <option value="">—</option>
+                                            {#each NOTAS as n}
+                                                <option value={n}>{n}</option>
+                                            {/each}
+                                        </select>
+                                    </div>
 
                                     <button
                                         type="button"
                                         on:click={() => toggleObs(key)}
                                         title="Observación"
-                                        class="btn-obs {obsAbierta ? 'btn-obs--activo' : ''} {tieneObs ? 'btn-obs--con-datos' : ''}"
+                                        class="btn-obs {obsAbierta
+                                            ? 'btn-obs--activo'
+                                            : ''} {tieneObs
+                                            ? 'btn-obs--con-datos'
+                                            : ''}"
                                     >
-                                        <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
-                                            <path d="M2 2h10v8H8l-2 2-1-2H2V2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
-                                            <path d="M4 5h6M4 7.5h4" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>
+                                        <svg
+                                            width="11"
+                                            height="11"
+                                            viewBox="0 0 14 14"
+                                            fill="none"
+                                        >
+                                            <path
+                                                d="M2 2h10v8H8l-2 2-1-2H2V2z"
+                                                stroke="currentColor"
+                                                stroke-width="1.3"
+                                                stroke-linejoin="round"
+                                            />
+                                            <path
+                                                d="M4 5h6M4 7.5h4"
+                                                stroke="currentColor"
+                                                stroke-width="1.1"
+                                                stroke-linecap="round"
+                                            />
                                         </svg>
                                     </button>
                                 </div>
-
-                                {#if !notaActual}
-                                    <span class="text-[9px] text-gray-300 leading-none">sin nota</span>
-                                {/if}
 
                                 {#if obsAbierta}
                                     <div class="obs-box mt-1">
                                         <textarea
                                             value={obs[key] ?? ""}
-                                            on:input={(e) => setObs(key, e.currentTarget.value)}
+                                            on:input={(e) =>
+                                                setObs(
+                                                    key,
+                                                    e.currentTarget.value,
+                                                )}
                                             placeholder="Observación..."
                                             rows="2"
                                             class="obs-textarea"
@@ -375,81 +550,222 @@
 {/if}
 
 <style>
-  .col-nombre {
-    width: 150px;
-    min-width: 150px;
-    max-width: 150px;
-  }
-  .nombre-alumno { display: inline; }
-
-  @media (max-width: 640px) {
-    .col-nombre { width: 82px; min-width: 82px; max-width: 82px; }
-    .nombre-alumno {
-      font-size: .60rem;
-      line-height: 1.25;
-      word-break: break-word;
-      white-space: normal;
-      display: block;
+    .col-nombre {
+        width: 150px;
+        min-width: 150px;
+        max-width: 150px;
     }
-  }
+    .nombre-alumno {
+        display: inline;
+    }
 
-  .btn-obs {
-    width: 22px; height: 28px;
-    display: inline-flex; align-items: center; justify-content: center;
-    border-radius: 4px; border: none; background: transparent;
-    color: #C8D3E8; cursor: pointer;
-    transition: background .15s, color .15s;
-    flex-shrink: 0;
-  }
-  .btn-obs:hover            { background: #EEF2F9; color: #1B3A6B; }
-  .btn-obs--activo          { background: #EEF2F9; color: #1B3A6B; }
-  .btn-obs--con-datos       { color: #C8882A; }
-  .btn-obs--con-datos:hover { background: #FEF3E2; color: #A06820; }
+    @media (max-width: 640px) {
+        .col-nombre {
+            width: 82px;
+            min-width: 82px;
+            max-width: 82px;
+        }
+        .nombre-alumno {
+            font-size: 0.6rem;
+            line-height: 1.25;
+            word-break: break-word;
+            white-space: normal;
+            display: block;
+        }
+    }
 
-  .obs-box { width: 100%; }
-  .obs-textarea {
-    width: 100%; min-width: 130px;
-    font-size: .72rem; line-height: 1.4;
-    border: 1px solid #DDE3EE; border-radius: 6px;
-    padding: 4px 6px; resize: vertical; outline: none;
-    color: #1A2332; background: #FAFAFA;
-    transition: border-color .15s;
-  }
-  .obs-textarea:focus { border-color: rgba(27,58,107,.35); background: #fff; }
-  .obs-preview {
-    font-size: .68rem; color: #C8882A;
-    line-height: 1.3; margin-top: 2px;
-    text-align: left; white-space: pre-wrap;
-    word-break: break-word; max-height: 40px; overflow: hidden;
-  }
+    .btn-obs {
+        width: 22px;
+        height: 28px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 4px;
+        border: none;
+        background: transparent;
+        color: #c8d3e8;
+        cursor: pointer;
+        transition:
+            background 0.15s,
+            color 0.15s;
+        flex-shrink: 0;
+    }
+    .btn-obs:hover {
+        background: #eef2f9;
+        color: #1b3a6b;
+    }
+    .btn-obs--activo {
+        background: #eef2f9;
+        color: #1b3a6b;
+    }
+    .btn-obs--con-datos {
+        color: #c8882a;
+    }
+    .btn-obs--con-datos:hover {
+        background: #fef3e2;
+        color: #a06820;
+    }
 
-  :global(.bg-blue-600)                   { background-color: #1B3A6B !important; }
-  :global(.bg-blue-500)                   { background-color: #2A5298 !important; }
-  :global(.bg-blue-50)                    { background-color: #EEF2F9 !important; }
-  :global(.bg-blue-100)                   { background-color: #D6E3F5 !important; }
-  :global(.hover\:bg-blue-700:hover)      { background-color: #2A5298 !important; }
-  :global(.hover\:bg-blue-50:hover)       { background-color: #EEF2F9 !important; }
-  :global(.hover\:bg-blue-100:hover)      { background-color: #D6E3F5 !important; }
-  :global(.hover\:bg-blue-100\/70:hover)  { background-color: rgba(214,227,245,.7) !important; }
-  :global(.disabled\:bg-blue-300)         { background-color: rgba(27,58,107,.32) !important; }
-  :global(.text-blue-600)                 { color: #1B3A6B !important; }
-  :global(.text-blue-700)                 { color: #1B3A6B !important; }
-  :global(.text-blue-800)                 { color: #0F2A52 !important; }
-  :global(.text-blue-500)                 { color: #2A5298 !important; }
-  :global(.hover\:text-blue-600:hover)    { color: #1B3A6B !important; }
-  :global(.hover\:text-blue-700:hover)    { color: #0F2A52 !important; }
-  :global(.group-hover\:text-blue-600)    { color: #1B3A6B !important; }
-  :global(.group-hover\:text-blue-400)    { color: rgba(27,58,107,.55) !important; }
-  :global(.border-blue-500)              { border-color: #1B3A6B !important; }
-  :global(.border-blue-300)              { border-color: rgba(27,58,107,.35) !important; }
-  :global(.border-blue-200)              { border-color: rgba(27,58,107,.2) !important; }
-  :global(.border-blue-100)              { border-color: rgba(27,58,107,.12) !important; }
-  :global(.focus\:ring-blue-500)         { --tw-ring-color: rgba(27,58,107,.4) !important; }
-  :global(.focus\:ring-blue-400)         { --tw-ring-color: rgba(27,58,107,.35) !important; }
-  :global(.divide-blue-100 > * + *)      { border-color: rgba(27,58,107,.1) !important; }
-  :global(.bg-blue-500.rounded-full)     { background-color: #1B3A6B !important; }
-  :global(.text-blue-600.border.border-blue-200) {
-    color: #1B3A6B !important;
-    border-color: rgba(27,58,107,.22) !important;
-  }
+    .obs-box {
+        width: 100%;
+    }
+    .obs-textarea {
+        width: 100%;
+        min-width: 130px;
+        font-size: 0.72rem;
+        line-height: 1.4;
+        border: 1px solid #dde3ee;
+        border-radius: 6px;
+        padding: 4px 6px;
+        resize: vertical;
+        outline: none;
+        color: #1a2332;
+        background: #fafafa;
+        transition: border-color 0.15s;
+    }
+    .obs-textarea:focus {
+        border-color: rgba(27, 58, 107, 0.35);
+        background: #fff;
+    }
+    .obs-preview {
+        font-size: 0.68rem;
+        color: #c8882a;
+        line-height: 1.3;
+        margin-top: 2px;
+        text-align: left;
+        white-space: pre-wrap;
+        word-break: break-word;
+        max-height: 40px;
+        overflow: hidden;
+    }
+
+    .nota-wrapper {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+    }
+    .nota-dot {
+        position: absolute;
+        left: 6px;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 1;
+        flex-shrink: 0;
+    }
+    .nota-dot--AD {
+        background: #4f46e5;
+    }
+    .nota-dot--A {
+        background: #16a34a;
+    }
+    .nota-dot--B {
+        background: #f59e0b;
+    }
+    .nota-dot--C {
+        background: #dc2626;
+    }
+
+    .nota-select {
+        appearance: none;
+        -webkit-appearance: none;
+        width: 62px;
+        height: 30px;
+        padding-left: 18px;
+        padding-right: 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-align: center;
+        border-radius: 6px;
+        border: 1.5px solid #e5e7eb;
+        cursor: pointer;
+        outline: none;
+        background-color: #f9fafb;
+        color: #374151;
+        transition: border-color 0.15s;
+    }
+    .nota-select:focus {
+        border-color: rgba(27, 58, 107, 0.4);
+    }
+
+    :global(.bg-blue-600) {
+        background-color: #1b3a6b !important;
+    }
+    :global(.bg-blue-500) {
+        background-color: #2a5298 !important;
+    }
+    :global(.bg-blue-50) {
+        background-color: #eef2f9 !important;
+    }
+    :global(.bg-blue-100) {
+        background-color: #d6e3f5 !important;
+    }
+    :global(.hover\:bg-blue-700:hover) {
+        background-color: #2a5298 !important;
+    }
+    :global(.hover\:bg-blue-50:hover) {
+        background-color: #eef2f9 !important;
+    }
+    :global(.hover\:bg-blue-100:hover) {
+        background-color: #d6e3f5 !important;
+    }
+    :global(.hover\:bg-blue-100\/70:hover) {
+        background-color: rgba(214, 227, 245, 0.7) !important;
+    }
+    :global(.disabled\:bg-blue-300) {
+        background-color: rgba(27, 58, 107, 0.32) !important;
+    }
+    :global(.text-blue-600) {
+        color: #1b3a6b !important;
+    }
+    :global(.text-blue-700) {
+        color: #1b3a6b !important;
+    }
+    :global(.text-blue-800) {
+        color: #0f2a52 !important;
+    }
+    :global(.text-blue-500) {
+        color: #2a5298 !important;
+    }
+    :global(.hover\:text-blue-600:hover) {
+        color: #1b3a6b !important;
+    }
+    :global(.hover\:text-blue-700:hover) {
+        color: #0f2a52 !important;
+    }
+    :global(.group-hover\:text-blue-600) {
+        color: #1b3a6b !important;
+    }
+    :global(.group-hover\:text-blue-400) {
+        color: rgba(27, 58, 107, 0.55) !important;
+    }
+    :global(.border-blue-500) {
+        border-color: #1b3a6b !important;
+    }
+    :global(.border-blue-300) {
+        border-color: rgba(27, 58, 107, 0.35) !important;
+    }
+    :global(.border-blue-200) {
+        border-color: rgba(27, 58, 107, 0.2) !important;
+    }
+    :global(.border-blue-100) {
+        border-color: rgba(27, 58, 107, 0.12) !important;
+    }
+    :global(.focus\:ring-blue-500) {
+        --tw-ring-color: rgba(27, 58, 107, 0.4) !important;
+    }
+    :global(.focus\:ring-blue-400) {
+        --tw-ring-color: rgba(27, 58, 107, 0.35) !important;
+    }
+    :global(.divide-blue-100 > * + *) {
+        border-color: rgba(27, 58, 107, 0.1) !important;
+    }
+    :global(.bg-blue-500.rounded-full) {
+        background-color: #1b3a6b !important;
+    }
+    :global(.text-blue-600.border.border-blue-200) {
+        color: #1b3a6b !important;
+        border-color: rgba(27, 58, 107, 0.22) !important;
+    }
 </style>
